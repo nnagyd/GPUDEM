@@ -58,8 +58,22 @@ __global__ void solver(struct particle particles, int numberOfActiveParticles, s
     
     for(int i = launch*timestep.saveSteps; i < (launch+1)*timestep.saveSteps; i++)
     {
+        //0. Start of the step
+        contactHandling::ResetContacts(tid,contacts);
+        rmem.F.x = constant::ZERO;
+        rmem.F.y = constant::ZERO;
+        rmem.F.z = constant::ZERO;
+        rmem.M.x = constant::ZERO;
+        rmem.M.y = constant::ZERO;
+        rmem.M.z = constant::ZERO;
 
-        //1. contact search
+        //1. boundary conditions 
+        if(domainType == DomainType::Rectangular && NumberOfBoundaries > 0)
+        {
+            domainHandling::applyBoundaryConditions(tid,rmem,particles,boundaryConditions,contacts,pars,timestep);
+        }
+
+        //2. contact search
         if(contactSearch == ContactSearch::BruteForce)
         {
             contactHandling::BruteForceContactSearch(tid,rmem,numberOfActiveParticles,particles,contacts);
@@ -70,13 +84,13 @@ __global__ void solver(struct particle particles, int numberOfActiveParticles, s
             contactHandling::DecomposedDomainsContactSearch(tid,rmem,numberOfActiveParticles,particles,contacts);
         }
 
-        //2. calculate forces
+        //3. calculate forces
         if(contactModel == ContactModel::Mindlin)
         {
             forceHandling::calculateForceMindlin(tid,rmem,particles,contacts, pars, timestep);
         }
 
-        //3. calculate acceleration
+        //4. calculate acceleration
         accelerationHandling::calculateDefault(tid, rmem, particles);
         if(BodyForce) //add the acceleration as a result of gravity
         {
@@ -92,7 +106,7 @@ __global__ void solver(struct particle particles, int numberOfActiveParticles, s
         }
         
 
-        //3. timestepping 
+        //5. timestepping 
         if(timeIntegration == TimeIntegration::Euler)
         {
             integrators::euler(tid,rmem,particles,timestep);
@@ -106,13 +120,7 @@ __global__ void solver(struct particle particles, int numberOfActiveParticles, s
             integrators::adams2(tid,rmem,particles,timestep,i);
         }
 
-        //4. boundary conditions 
-        if(domainType == DomainType::Rectangular && NumberOfBoundaries > 0)
-        {
-            domainHandling::applyBoundaryConditions(tid,rmem,particles,boundaryConditions);
-        }
-
-        //5. Synchronize registers and global memory
+        //6. Synchronize registers and global memory
         registerHandling::endOfStepSync(tid,rmem,particles);
         if(UseGPUWideThreadSync)
         {

@@ -47,10 +47,6 @@ namespace forceHandling
         vec3D vs(rmem.v.x,rmem.v.y,rmem.v.z);
         vec3D omegas(rmem.omega.x,rmem.omega.y,rmem.omega.z);
 
-        vec3D Ftotal(constant::ZERO,constant::ZERO,constant::ZERO);
-        vec3D Mtotal(constant::ZERO,constant::ZERO,constant::ZERO);
-
-
         //go through all the contacts
         for(int i = 0; i < contacts.count; i++)
         {
@@ -73,21 +69,18 @@ namespace forceHandling
             //calculate tangential overlap
             contacts.deltat[i] = contacts.deltat[i] + (vrelt * timestep.dt);
 
-            //equivalent shear stiffness
-            var_type Gstar = pars.G; //UPDATE
-
             //equivalent stiffness, normal and tangential
             var_type Rdelta = sqrt(contacts.Rstar[i]*contacts.deltan[i]);
-            var_type Sn = constant::NUMBER_2 * contacts.Estar[i] * Rdelta;
-            var_type St = constant::NUMBER_8 * Gstar * Rdelta;
+            var_type Sn = constant::NUMBER_2 * pars.pairing[rmem.material].E_star[contacts.material[i]] * Rdelta;
+            var_type St = constant::NUMBER_8 * pars.pairing[rmem.material].G_star[contacts.material[i]] * Rdelta;
 
             /// FORCES
             //normal elastic force
-            var_type Fne_scalar = constant::NUMBER_4o3 * contacts.Estar[i] * Rdelta * contacts.deltan[i];
+            var_type Fne_scalar = constant::NUMBER_4o3 * pars.pairing[rmem.material].E_star[contacts.material[i]] * Rdelta * contacts.deltan[i];
             vec3D Fne = contacts.r[i]* (-Fne_scalar);
 
             //normal damping force
-            var_type Fnd_scalar = constant::DAMPING * pars.beta * sqrt(Sn * contacts.mstar[i]);
+            var_type Fnd_scalar = constant::DAMPING * pars.pairing[rmem.material].beta_star[contacts.material[i]] * sqrt(Sn * contacts.mstar[i]);
             vec3D Fnd = vreln * Fnd_scalar;
 
             //tangential elastic force
@@ -95,7 +88,7 @@ namespace forceHandling
             Fte = contacts.deltat[i] * (-St);
 
             //tangential damping force
-            var_type Ftd_scalar = constant::DAMPING * pars.beta * sqrt(St * contacts.mstar[i]);
+            var_type Ftd_scalar = constant::DAMPING * pars.pairing[rmem.material].beta_star[contacts.material[i]] * sqrt(St * contacts.mstar[i]);
             vec3D Ftd = vrelt * Ftd_scalar;
 
             //total normal and tangentional force
@@ -103,10 +96,10 @@ namespace forceHandling
             vec3D Ft = Fte + Ftd;
 
             //check for sliding
-            if(Ft.length() > Fn.length() * contacts.mu0star[i])
+            if(Ft.length() > Fn.length() * pars.pairing[rmem.material].mu0_star[contacts.material[i]])
             {
                 //if sliding
-                Ft = Fn * contacts.mustar[i];
+                Ft = Fn * pars.pairing[rmem.material].mu_star[contacts.material[i]];
             }
 
             //torque
@@ -125,18 +118,13 @@ namespace forceHandling
             }
 
             //add the force and torque to the total
-            Ftotal = Ftotal + F;
-            Mtotal = Mtotal + M;
-
+            rmem.F.x += F.x;
+            rmem.F.y += F.y;
+            rmem.F.z += F.z;
+            rmem.M.x += M.x;
+            rmem.M.y += M.y;
+            rmem.M.z += M.z;
         }
-
-        //copy force and torque to the particles data
-        rmem.F.x = Ftotal.x;
-        rmem.F.y = Ftotal.y;
-        rmem.F.z = Ftotal.z;
-        rmem.M.x = Mtotal.x;
-        rmem.M.y = Mtotal.y;
-        rmem.M.z = Mtotal.z;
     }
 
 

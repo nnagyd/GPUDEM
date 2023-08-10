@@ -47,8 +47,9 @@ constexpr DomainType domainType = DomainType::Rectangular;
 */
 
 ///Number of particles in the simulation
-constexpr int NumberOfParticles = 48640;
+constexpr int NumberOfParticles = 4096;
 constexpr int MaxContactNumber = 16;
+constexpr int NumberOfMaterials = 2;
 
 ///Particle initalization
 enum class ParticleSizeDistribution { None, Uniform, Gauss };
@@ -94,7 +95,8 @@ constexpr bool SaveVelocity = true;
 constexpr bool SaveAngularVelocity = false;
 constexpr bool SaveForce = false;
 constexpr bool SaveTorque = false;
-constexpr bool SaveId = true;
+constexpr bool SaveId = false;
+constexpr bool SaveMaterial = true;
 
 /*
     -------- Setting specifics ------------

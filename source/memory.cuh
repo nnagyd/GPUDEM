@@ -58,10 +58,7 @@ namespace memoryHandling
             particlesH.m_rec[i] = constant::ZERO;
             particlesH.theta[i] = constant::ZERO;
             particlesH.theta_rec[i] = constant::ZERO;
-            particlesH.E_rec[i] = constant::ZERO;
-            particlesH.nu[i] = constant::ZERO;
-            particlesH.mu[i] = constant::ZERO;
-            particlesH.mu0[i] = constant::ZERO;
+            particlesH.material[i] = -1;
             particlesH.cid[i] = 1;
         }
 
@@ -104,10 +101,7 @@ namespace memoryHandling
         particlesH.m_rec = new var_type[NumberOfParticles];
         particlesH.theta = new var_type[NumberOfParticles];
         particlesH.theta_rec = new var_type[NumberOfParticles];
-        particlesH.E_rec = new var_type[NumberOfParticles];
-        particlesH.nu = new var_type[NumberOfParticles];
-        particlesH.mu = new var_type[NumberOfParticles];
-        particlesH.mu0 = new var_type[NumberOfParticles];
+        particlesH.material = new int[NumberOfParticles];
         particlesH.cid = new int[NumberOfParticles];
 
 
@@ -149,10 +143,7 @@ namespace memoryHandling
         delete particlesH.m_rec;
         delete particlesH.theta;
         delete particlesH.theta_rec;
-        delete particlesH.E_rec;
-        delete particlesH.nu;
-        delete particlesH.mu;
-        delete particlesH.mu0;
+        delete particlesH.material;
         delete particlesH.cid;
      }
 
@@ -192,10 +183,7 @@ namespace memoryHandling
         cudaMalloc((void**)&particlesD.m_rec, memorySize);
         cudaMalloc((void**)&particlesD.theta, memorySize);
         cudaMalloc((void**)&particlesD.theta_rec, memorySize);
-        cudaMalloc((void**)&particlesD.E_rec, memorySize);
-        cudaMalloc((void**)&particlesD.nu, memorySize);
-        cudaMalloc((void**)&particlesD.mu, memorySize);
-        cudaMalloc((void**)&particlesD.mu0, memorySize);
+        cudaMalloc((void**)&particlesD.material, sizeof(int) * NumberOfParticles);
         cudaMalloc((void**)&particlesD.cid, sizeof(int) * NumberOfParticles);
      }
 
@@ -235,10 +223,7 @@ namespace memoryHandling
         cudaFree(particlesD.m_rec);
         cudaFree(particlesD.theta);
         cudaFree(particlesD.theta_rec);
-        cudaFree(particlesD.E_rec);
-        cudaFree(particlesD.nu);
-        cudaFree(particlesD.mu);
-        cudaFree(particlesD.mu0);
+        cudaFree(particlesD.material);
         cudaFree(particlesD.cid);
     }
 
@@ -302,10 +287,7 @@ namespace memoryHandling
             cudaMemcpy(dest.m_rec,source.m_rec,memorySize,kind);
             cudaMemcpy(dest.theta,source.theta,memorySize,kind);
             cudaMemcpy(dest.theta_rec,source.theta_rec,memorySize,kind);
-            cudaMemcpy(dest.E_rec,source.E_rec,memorySize,kind);
-            cudaMemcpy(dest.nu,source.nu,memorySize,kind);
-            cudaMemcpy(dest.mu,source.mu,memorySize,kind);
-            cudaMemcpy(dest.mu0,source.mu0,memorySize,kind);
+            cudaMemcpy(dest.material,source.material,NumberOfParticles * sizeof(int),kind);
         }
 
         if(vars == Force || vars == All)

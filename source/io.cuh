@@ -249,6 +249,19 @@ namespace ioHandling
             out << "\n\t\t\t\t</DataArray>\n";
         }
 
+        //print material
+        out << "\t\t\t\t<!-- Particle materials -->\n";
+        if(outputFormat == OutputFormat::ASCII && SaveMaterial)
+        {
+            out << "\t\t\t\t<DataArray type=\"Int32\" Name=\"Material\" format=\"ascii\">\n";
+            for(int i = 0; i < numberOfActiveParticles; i++)
+            {
+                out << "\t\t\t\t\t";
+                out.width(12); out << particles.material[i] << "\n"; 
+            }
+            out << "\n\t\t\t\t</DataArray>\n";
+        }
+
         //end stuff
         out << "\t\t\t</PointData>\n";
         out << "\t\t</Piece>\n";
@@ -314,6 +327,7 @@ namespace ioHandling
                         std::istringstream iss(line);
                         iss >> particles.R[idx];
                         idx++;
+                        if(idx>=NumberOfParticles) break;
                     }
                 }
             }
@@ -342,6 +356,7 @@ namespace ioHandling
                         std::istringstream iss(line);
                         iss >> particles.u.x[idx] >> particles.u.y[idx] >> particles.u.z[idx];
                         idx++;
+                        if(idx>=NumberOfParticles) break;
                     }
                 }
             }

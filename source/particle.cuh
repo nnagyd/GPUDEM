@@ -93,17 +93,8 @@ struct particle
     /// Inverse of inertia of the particle
     var_type *theta_rec;
 
-    /// E Modulus of the particle
-    var_type *E_rec;
-
-    ///Poisson ratio of the particle
-    var_type *nu;
-
-    ///Poisson ratio of the particle
-    var_type *mu;
-
-    ///Poisson ratio of the particle
-    var_type *mu0;
+    /// Material set
+    int *material;
 
     ///Particle cell id
     int *cid;
@@ -135,12 +126,12 @@ struct particleDistribution
 namespace particleHandling
 {
 
-    void generateParticleParameters(struct particle p, struct materialParameters pars)
+    void generateParticleParameters(struct particle p, struct materialParameters pars, int mat_id, int start_id, int end_id)
     {
-        for(int i = 0; i < NumberOfParticles; i++)
+        for(int i = start_id; i < end_id; i++)
         {
             //mass and inertia
-            p.m[i] = pars.rho * p.R[i] * p.R[i] * p.R[i] * constant::VOLUME_FACTOR;
+            p.m[i] = pars.rho[mat_id] * p.R[i] * p.R[i] * p.R[i] * constant::VOLUME_FACTOR;
             p.theta[i] = constant::NUMBER_04 * p.m[i] * p.R[i] * p.R[i];
 
             //Reciprocals
@@ -149,10 +140,7 @@ namespace particleHandling
             p.theta_rec[i] = constant::NUMBER_1/p.theta[i];
 
             //physical properties
-            p.E_rec[i] = constant::NUMBER_1/pars.E;
-            p.nu[i] = pars.nu;
-            p.mu[i] = pars.mu;
-            p.mu0[i] = pars.mu0;
+            p.material[i] = mat_id;
         }
     }
 

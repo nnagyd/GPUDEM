@@ -36,28 +36,40 @@ int main(int argc, char const *argv[])
 
     //material parameters
     struct materialParameters materials;
-    //particles
-    materials.rho[0]=1000.0f;
-    materials.E[0] = 20000.0f;
-    materials.G[0] = 20000.0f;
+    materials.rho[0]= 300.0f;
+    materials.E[0] = 10000.0f;
+    materials.G[0] = 10000.0f;
     materials.nu[0] = 0.3f;
-    materials.e[0] = 0.1f;
-    materials.mu[0] = 0.5f;
+    materials.e[0] = 0.001f;
+    materials.mu[0] = 0.6f;
     materials.mu0[0] = 0.7f;
-    //walls
-    materials.E[1] = 200000.0f;
-    materials.G[1] = 200000.0f;
+
+    materials.rho[1]=1000.0f;
+    materials.E[1] = 20000.0f;
+    materials.G[1] = 20000.0f;
     materials.nu[1] = 0.3f;
-    materials.e[1] = 0.1f;
-    materials.mu[1] = 0.6f;
-    materials.mu0[1] = 0.7f;
+    materials.e[1] = 0.002f;
+    materials.mu[1] = 0.4f;
+    materials.mu0[1] = 0.5f;
 
     materialHandling::calculateMaterialContact(materials,materialHandling::methods::Min,materialHandling::methods::HarmonicMean,materialHandling::methods::HarmonicMean);
     materialHandling::printMaterialInfo(materials,true);
 
+    //particle distribution
+    struct particleDistribution pdist;
+    pdist.min.x = -1.0f;
+    pdist.max.x =  1.0f;
+    pdist.min.y = -1.0f;
+    pdist.max.y =  1.0f;
+    pdist.min.z = 0.5f;
+    pdist.max.z = 5.0f;
+    pdist.vmean = 0.0f;
+    pdist.vsigma = 0.00f;
+    pdist.Rmean = 0.04f;
+    pdist.Rsigma = 0.01f;
 
     //timestep settings
-    float dt = 2.5e-4f;
+    float dt = 1e-4f;
     float saves = 0.05f;
     struct timestepping timestep(0.0f,50.0f,dt,saves);
 
@@ -76,15 +88,17 @@ int main(int argc, char const *argv[])
     BCs.n[4] = vec3D(0.0f, 1.0f,0.0f); BCs.p[4] = vec3D(0.0f, 1.0f,0.0f);
     for(int i = 0; i < NumberOfBoundaries; i++)
     {
-        BCs.type[i] = BoundaryConditionType::HertzWall; 
-        BCs.material[i] = 1;
+        BCs.type[i] = BoundaryConditionType::ReflectiveWall; 
+        BCs.alpha[i] =  0.8f; 
+        BCs.beta[i] = 0.003f;
     }
 
     //particles, host side
     struct particle particlesH;
     memoryHandling::allocateHostParticles(particlesH);
-    ioHandling::readParticlesVTK(particlesH,"data/ex3_input.vtu");
-    particleHandling::generateParticleParameters(particlesH,materials,0,0,NumberOfParticles);
+    particleHandling::generateParticleLocation(particlesH,pdist);
+    particleHandling::generateParticleParameters(particlesH,materials,0,0,NumberOfParticles/2);
+    particleHandling::generateParticleParameters(particlesH,materials,1,NumberOfParticles/2,NumberOfParticles);
 
     //particles, device side
     struct particle particlesD;
@@ -111,18 +125,35 @@ int main(int argc, char const *argv[])
     //SIMULATION
     auto startTime = std::chrono::high_resolution_clock::now();
     for(int i = 0; i < numberOfLaunches; i++)
-    {
-        //print info
-        if(i%1==0)
-        {
-            std::cout << "Launch " << i << "\t/ " << numberOfLaunches << "\n";
-        }
-        
+    {        
         //save energy
         float K = forceHandling::calculateTotalKineticEnergy(particlesH,NumberOfParticles);
         float P = forceHandling::calculateTotalPotentialEnergy(particlesH,gravity,NumberOfParticles);
         energy << K << "\t" << P << "\t" << K+P << "\n";
-        std::cout << K << "\t" << P << "\t" << K+P << "\n";
+
+
+        //print info
+        if(i%10==0)
+        {
+            std::cout << "Launch " << i << "\t/ " << numberOfLaunches << "\n";
+            std::cout << "K="<< K << "\t P=" << P << "\t T=" << K+P << "\n";
+        }
+
+        if(i == 100)
+        {
+            gravity.x = 3.0f;
+            gravity.z = 12.0f;
+        }
+        if(i == 105)
+        {
+            gravity.x = -3.0f;
+            gravity.z = -12.0f;
+        }
+        if(i == 110)
+        {
+            gravity.x = 0.0f;
+            gravity.z = -9.81f;
+        }
 
         //save
         std::string name = output_folder + "/test_" + std::to_string(i) + ".vtu";
@@ -139,8 +170,6 @@ int main(int argc, char const *argv[])
             (void*)&i
         };
         cudaLaunchCooperativeKernel((void*)solver, GridSize, BlockSize, kernelArgs);
-
-        //solver<<<GridSize,BlockSize>>>(particlesD,NumberOfParticles,materials,timestep,gravity,BCs,i);
         CHECK(cudaDeviceSynchronize());
 
         //copy D2H

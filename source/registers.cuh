@@ -36,14 +36,11 @@ struct registerMemory
     //local copy of moments
     struct coordinate M;
 
-    //local copy of mu
-    var_type mu;
-
-    //local copy of mu0
-    var_type mu0;
-
     //local copy of R
     var_type R;
+
+    //local copy of m
+    var_type m;
 
     //local copy of m_rec
     var_type m_rec;
@@ -54,11 +51,8 @@ struct registerMemory
     //local copy of R_rec
     var_type R_rec;
 
-    //local copy of E_rec
-    var_type E_rec;
-
-    //local copy of nu
-    var_type nu;
+    //material id
+    int material;
 
     //local copy of cid
     int cid;
@@ -81,13 +75,11 @@ namespace registerHandling{
         rmem.omega.z = particles.omega.z[tid];
 
         //scalars
-        rmem.nu = particles.nu[tid];
-        rmem.mu = particles.mu[tid];
-        rmem.mu0 = particles.mu0[tid];
+        rmem.material = particles.material[tid];
         rmem.R = particles.R[tid];
         rmem.R_rec = particles.R_rec[tid];
+        rmem.m = particles.m[tid];
         rmem.m_rec = particles.m_rec[tid];
-        rmem.E_rec = particles.E_rec[tid];
         rmem.theta_rec = particles.theta_rec[tid];
 
         if(AccelerationStored == 2)

@@ -12,9 +12,10 @@
 #define domain_H
 
 #include "settings.cuh"
+#include "timestep.cuh"
 #include "math.cuh"
 
-enum BoundaryConditionType {None, ReflectiveWall};
+enum BoundaryConditionType {None, ReflectiveWall, HertzWall};
 enum Direction {East, West, North, South, Top, Bottom};
 
 /**
@@ -39,12 +40,44 @@ struct boundaryCondition
 
     ///par3
     var_type gamma[NumberOfBoundaries];
+
+    ///parameter set for materials
+    int material[NumberOfBoundaries];
 };
 
 
 namespace domainHandling
 {
-    __device__ inline void applyBoundaryConditions(int tid, struct registerMemory &rmem, struct particle particles, struct boundaryCondition boundaryConditions)
+    void __device__ CalculateOverlap(int tid, struct registerMemory &rmem, int i, var_type d, struct contact &contacts)
+    {
+        //data
+        contacts.tid[contacts.count] = -i-1; //assign negative id-s for these contacts
+        contacts.deltan[contacts.count] = rmem.R - d;
+
+        //check if they were contact in the last step
+        bool wasInContact = false;
+        for(int j = 0; j < MaxContactNumber; j++)
+        {
+            if(contacts.tid[contacts.count] == contacts.tid_last[j]) //they were in contact the last time
+            {
+                wasInContact = true;
+                contacts.deltat[contacts.count].x = contacts.deltat_last[contacts.count].x;
+                contacts.deltat[contacts.count].y = contacts.deltat_last[contacts.count].y;
+                contacts.deltat[contacts.count].z = contacts.deltat_last[contacts.count].z;
+            }
+        }
+
+        //if they were not in contact then reset the tangential overlap
+        if(wasInContact == false)
+        {
+            contacts.deltat[contacts.count].x = constant::ZERO;
+            contacts.deltat[contacts.count].y = constant::ZERO;
+            contacts.deltat[contacts.count].z = constant::ZERO;
+        }
+    }//end of calculateWallContact
+
+
+    __device__ inline void applyBoundaryConditions(int tid, struct registerMemory &rmem, struct particle particles, struct boundaryCondition boundaryConditions, struct contact &contacts, struct materialParameters pars, struct timestepping timestep)
     {
         for(int i = 0; i < NumberOfBoundaries; i++)
         {
@@ -97,6 +130,71 @@ namespace domainHandling
 
 
                 }//end of if reflective wall
+
+                if(boundaryConditions.type[i] == BoundaryConditionType::HertzWall)
+                {
+                    //Reads last overlap
+                    CalculateOverlap(tid,rmem,i,d,contacts);
+
+                    //calculate new tangential overlap
+                    contacts.deltat[contacts.count] = contacts.deltat[contacts.count] + (vt * timestep.dt);
+
+                    //contact position of contact
+                    contacts.p[i] = boundaryConditions.n[i]*d;
+                    
+                    //Stiffnesses
+                    var_type Rdelta = sqrt(rmem.R*contacts.deltan[contacts.count]);
+                    var_type Sn = constant::NUMBER_2 * pars.pairing[rmem.material].E_star[boundaryConditions.material[i]] * Rdelta;
+                    var_type St = constant::NUMBER_8 * pars.pairing[rmem.material].G_star[boundaryConditions.material[i]] * Rdelta;
+
+                    //normal elastic force
+                    var_type Fne_scalar = constant::NUMBER_4o3 * pars.pairing[rmem.material].E_star[boundaryConditions.material[i]] * Rdelta * contacts.deltan[contacts.count];
+                    vec3D Fne = boundaryConditions.n[i]* (-Fne_scalar);
+
+                    //normal damping force
+                    var_type Fnd_scalar = constant::DAMPING * pars.pairing[rmem.material].beta_star[boundaryConditions.material[i]] * sqrt(Sn * rmem.m);
+                    vec3D Fnd = vn * Fnd_scalar;
+
+                    //tangential elastic force
+                    vec3D Fte;
+                    Fte = contacts.deltat[contacts.count] * (-St);
+
+                    //tangential damping force
+                    var_type Ftd_scalar = constant::DAMPING * pars.pairing[rmem.material].beta_star[boundaryConditions.material[i]] * sqrt(St * rmem.m);
+                    vec3D Ftd = vt * Ftd_scalar;
+
+                    //total normal and tangentional force
+                    vec3D Fn = Fne + Fnd;
+                    vec3D Ft = Fte + Ftd;
+
+                    //check for sliding
+                    if(Ft.length() > Fn.length() * pars.pairing[rmem.material].mu0_star[boundaryConditions.material[i]])
+                    {
+                        //if sliding
+                        Ft = Fn * pars.pairing[rmem.material].mu_star[boundaryConditions.material[i]];
+                    }
+
+                    //torque
+                    vec3D M = contacts.p[i] ^ Ft;
+
+                    //force
+                    vec3D F = Fn + Ft;
+
+                    //add the forces to the total
+                    rmem.F.x += F.x;
+                    rmem.F.y += F.y;
+                    rmem.F.z += F.z;
+                    rmem.M.x += M.x;
+                    rmem.M.y += M.y;
+                    rmem.M.z += M.z;
+
+                    //check end
+                    contacts.count++; 
+                    if(contacts.count >= MaxContactNumber)
+                    {
+                        contacts.count = MaxContactNumber - 1;
+                    }
+                }//end of Hertz Wall
             }//end of if contact
         }//end of for through boundaries
     }//end of function

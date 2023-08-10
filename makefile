@@ -1,4 +1,7 @@
-CompilerFlags = -O3 -std=c++17 -lineinfo -maxrregcount=48 --ptxas-options=-v --use_fast_math --gpu-architecture=sm_86
+
+.PHONY: clean
+
+CompilerFlags = -O3 -std=c++17 -lineinfo -maxrregcount=64 --ptxas-options=-v --use_fast_math --gpu-architecture=sm_86
 #CompilerFlags = -std=c++11 --gpu-architecture=sm_86
 
 all: gpudem
@@ -23,10 +26,26 @@ ex3:
 	nvcc -o GPUDEM_EX3 $(CompilerFlags) ex3_deposition2.cu
 	@echo -------------------------------- GPUDEM ready ------------------------------- 
 
+ex4:
+	@echo ---------------------------- Compiling Example 4 ---------------------------- 
+	nvcc -o GPUDEM_EX4 $(CompilerFlags) ex4_multi_material.cu
+	@echo -------------------------------- GPUDEM ready ------------------------------- 
+
 clean:
 	@echo ------------------------- Clening up GPUDEM Solver -------------------------- 
-	rm GPUDEM
-	rm GPUDEM_EX1
-	rm GPUDEM_EX2
-	rm GPUDEM_EX3
+	@if [ -e GPUDEM ]; then \
+		rm GPUDEM; \
+	fi
+	@if [ -e GPUDEM_EX1 ]; then \
+		rm GPUDEM_EX1; \
+	fi
+	@if [ -e GPUDEM_EX2 ]; then \
+		rm GPUDEM_EX2; \
+	fi
+	@if [ -e GPUDEM_EX3 ]; then \
+		rm GPUDEM_EX3; \
+	fi
+	@if [ -e GPUDEM_EX4 ]; then \
+		rm GPUDEM_EX4; \
+	fi
 	@echo ------------------------------- Cleanup ready ------------------------------- 

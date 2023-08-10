@@ -32,8 +32,8 @@
 namespace constant
 {
     //constants for force calculations
-    constexpr var_type CONST_PI = 3.141592653589793238462643;
-    constexpr var_type VOLUME_FACTOR = CONST_PI * 4.0 / 3.0;
+    constexpr var_type PI = 3.141592653589793238462643;
+    constexpr var_type VOLUME_FACTOR = PI * 4.0 / 3.0;
     constexpr var_type DAMPING = -1.8257418583505537115;  //-2.0 * sqrt(5.0/6.0);
 
     //numbers

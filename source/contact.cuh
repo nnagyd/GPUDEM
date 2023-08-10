@@ -28,20 +28,14 @@ struct contact
     ///tid of the particle of last contact
     int tid_last[MaxContactNumber];
 
+    ///type of other material
+    int material[MaxContactNumber];
+
     ///equivalent radius of contact
     var_type Rstar[MaxContactNumber];
 
     ///equiavlent mass of contact
     var_type mstar[MaxContactNumber];
-
-    ///equiavlent E of contact
-    var_type Estar[MaxContactNumber];
-
-    ///equiavlent E of contact
-    var_type mustar[MaxContactNumber];
-
-    ///equiavlent E of contact
-    var_type mu0star[MaxContactNumber];
 
     ///unit vector between particles
     vec3D r[MaxContactNumber];
@@ -114,7 +108,7 @@ namespace contactHandling
     } 
 
 
-        /**
+    /**
     * @brief Brute force contact search, which goes through all possible combinations 
     * 
     * @param tid Thread index of the particle
@@ -131,11 +125,10 @@ namespace contactHandling
         contacts.tid[contacts.count] = i;
         contacts.Rstar[contacts.count] = constant::NUMBER_1/(rmem.R_rec + particles.R_rec[i]);
         contacts.mstar[contacts.count] = constant::NUMBER_1/(rmem.m_rec + particles.m_rec[i]);
-
-        contacts.Estar[contacts.count] = constant::NUMBER_1/((constant::NUMBER_1 - rmem.nu*rmem.nu)*rmem.E_rec + (constant::NUMBER_1 - particles.nu[i]*particles.nu[i])*particles.E_rec[i]);
-        contacts.mustar[contacts.count] = constant::NUMBER_05*(rmem.mu + particles.mu[i]);
-        contacts.mu0star[contacts.count] = constant::NUMBER_05*(rmem.mu0 + particles.mu0[i]);
         contacts.deltan[contacts.count] = Rs - d;
+
+        //material of other
+        contacts.material[contacts.count] = particles.material[i];
 
         //contact position
         contacts.p[contacts.count].x = constant::NUMBER_05*(particles.u.x[i]-rmem.u.x);
@@ -171,8 +164,25 @@ namespace contactHandling
 
         //check end
         contacts.count++; 
+        if(contacts.count >= MaxContactNumber)
+        {
+            contacts.count = MaxContactNumber - 1;
+        }
     }//end of calculateContact
 
+
+    void __device__ ResetContacts(int tid, struct contact &contacts)
+    {
+        //set last tid and deltat_t
+        for(int j = 0; j < MaxContactNumber; j++)
+        {
+            contacts.tid_last[j] = contacts.tid[j];
+            contacts.deltat_last[j].x = contacts.deltat[j].x;
+            contacts.deltat_last[j].y = contacts.deltat[j].y;
+            contacts.deltat_last[j].z = contacts.deltat[j].z;
+        }
+        contacts.count = 0;
+    }
 
     /**
     * @brief Brute force contact search, which goes through all possible combinations 
@@ -184,17 +194,7 @@ namespace contactHandling
     */
     void __device__ BruteForceContactSearch(int tid, struct registerMemory &rmem, int numberOfActiveParticles, struct particle particles, struct contact &contacts)
     {
-        //set last tid and deltat_t
-        for(int j = 0; j < MaxContactNumber; j++)
-        {
-            contacts.tid_last[j] = contacts.tid[j];
-            contacts.deltat_last[j].x = contacts.deltat[j].x;
-            contacts.deltat_last[j].y = contacts.deltat[j].y;
-            contacts.deltat_last[j].z = contacts.deltat[j].z;
-        }
-
         //go through all the particles
-        contacts.count = 0;
         for(int i = 0; i < numberOfActiveParticles; i++)
         {
             var_type d = calculateDistance(rmem.u.x,rmem.u.y,rmem.u.z,particles.u.x[i],particles.u.y[i],particles.u.z[i]);
@@ -202,16 +202,6 @@ namespace contactHandling
             if(d < Rs && tid != i) //contact found
             {
                 CalculateContact(tid,rmem,i,d,Rs,particles,contacts);
-
-
-                if(contacts.count == MaxContactNumber)
-                {
-                    if(Debug) 
-                    {
-                        printf("Max contact number reached at thread%d\n",tid);
-                    }
-                    return;
-                }
             }
         }//end of for
     }//end of brute force
@@ -260,17 +250,7 @@ namespace contactHandling
 
     void __device__ DecomposedDomainsContactSearch(int tid, struct registerMemory &rmem, int numberOfActiveParticles, struct particle particles, struct contact &contacts)
     {
-        //set last tid and deltat_t
-        for(int j = 0; j < MaxContactNumber; j++)
-        {
-            contacts.tid_last[j] = contacts.tid[j];
-            contacts.deltat_last[j].x = contacts.deltat[j].x;
-            contacts.deltat_last[j].y = contacts.deltat[j].y;
-            contacts.deltat_last[j].z = contacts.deltat[j].z;
-        }
-
         //go through all the particles
-        contacts.count = 0;
         for(int i = 0; i < numberOfActiveParticles; i++)
         { 
             int cid = particles.cid[i];
@@ -281,20 +261,6 @@ namespace contactHandling
                 if(d < Rs && tid != i) //contact found
                 {
                     CalculateContact(tid,rmem,i,d,Rs,particles,contacts);
-
-                    if(Debug)
-                    {
-                        printf("Particles are in contact: %d \t %d\n",rmem.cid,cid);
-                    }
-
-                    if(contacts.count == MaxContactNumber)
-                    {
-                        if(Debug) 
-                        {
-                            printf("Max contact number reached at thread%d\n",tid);
-                        }
-                        return;
-                    }
                 }
             }
         }//end of for
