@@ -66,25 +66,25 @@ struct vector{
     }
 
     //subtraction
-    __device__ vector operator-(const vector& other) const 
+    __device__ __host__ vector operator-(const vector& other) const 
     {
         return vector(x - other.x, y - other.y, z - other.z);
     }
 
     //dot product
-    __device__ var_type operator*(const vector& other) const 
+    __device__ __host__ var_type operator*(const vector& other) const 
     {
         return x * other.x + y * other.y + z * other.z;
     }
 
     //multiplication with scalar
-    __device__ vector operator*(var_type scalar) const 
+    __device__ __host__ vector operator*(var_type scalar) const 
     {
         return vector(x * scalar, y * scalar, z * scalar);
     }
 
     //cross product
-    __device__ vector operator^(const vector& other) const 
+    __device__ __host__ vector operator^(const vector& other) const 
     {
         return vector(  y * other.z - z * other.y,
                         z * other.x - x * other.z,
@@ -92,7 +92,7 @@ struct vector{
     }
     
     //length
-    __device__ var_type length() const
+    __device__ __host__ var_type length() const
     {
         return sqrt(x*x+y*y+z*z);
     }

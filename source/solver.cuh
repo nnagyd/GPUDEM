@@ -68,7 +68,7 @@ __global__ void solver(struct particle particles, int numberOfActiveParticles, s
         rmem.M.z = constant::ZERO;
 
         //1. boundary conditions 
-        if(domainType == DomainType::Rectangular && NumberOfBoundaries > 0)
+        if(NumberOfBoundaries > 0)
         {
             domainHandling::applyBoundaryConditions(tid,rmem,particles,boundaryConditions,contacts,pars,timestep);
         }

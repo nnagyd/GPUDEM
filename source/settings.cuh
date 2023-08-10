@@ -29,25 +29,25 @@ using var_type = float;
 */
 
 ///GPU settings
-constexpr int BlockSize = 128;
+constexpr int BlockSize = 16;
 
 /*
     ---------- Domain settings ----------
 */
 
 ///Number of boundary conditions
-constexpr int NumberOfBoundaries = 5;
+constexpr int NumberOfBoundaries = 16;
 
 ///Domain settings
 enum class DomainType { Rectangular, STL };
-constexpr DomainType domainType = DomainType::Rectangular;
+constexpr DomainType domainType = DomainType::STL;
 
 /*
     -------- Particle settings ----------
 */
 
 ///Number of particles in the simulation
-constexpr int NumberOfParticles = 4096;
+constexpr int NumberOfParticles = 2048;
 constexpr int MaxContactNumber = 16;
 constexpr int NumberOfMaterials = 2;
 
