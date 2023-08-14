@@ -60,14 +60,13 @@ namespace forceHandling
             var_type Ri = particles.R[tidi];
 
             //kinematics
-            vec3D vrel;
-            vrel = vs - vi + ((omegas*rmem.R + omegai*Ri) ^ contacts.r[i]);
-            var_type vreln_scalar = vrel * contacts.r[i];
-            vec3D vreln =  contacts.r[i]*vreln_scalar;
-            vec3D vrelt = vrel - vreln;
+            vec3D v_rel = vs - vi + ((omegas*rmem.R + omegai*Ri) ^ contacts.r[i]);
+            var_type vn_rel_norm = v_rel * contacts.r[i];
+            vec3D vn_rel =  contacts.r[i]*vn_rel_norm;
+            vec3D vt_rel = v_rel - vn_rel;
 
             //calculate tangential overlap
-            contacts.deltat[i] = contacts.deltat[i] + (vrelt * timestep.dt);
+            contacts.deltat[i] = contacts.deltat[i] + (vt_rel * timestep.dt);
 
             //equivalent stiffness, normal and tangential
             var_type Rdelta = sqrt(contacts.Rstar[i]*contacts.deltan[i]);
@@ -76,46 +75,50 @@ namespace forceHandling
 
             /// FORCES
             //normal elastic force
-            var_type Fne_scalar = constant::NUMBER_4o3 * pars.pairing[rmem.material].E_star[contacts.material[i]] * Rdelta * contacts.deltan[i];
-            vec3D Fne = contacts.r[i]* (-Fne_scalar);
+            var_type Fne_norm = constant::NUMBER_4o3 * pars.pairing[rmem.material].E_star[contacts.material[i]] * Rdelta * contacts.deltan[i];
+            vec3D Fne = contacts.r[i]* (-Fne_norm);
 
             //normal damping force
-            var_type Fnd_scalar = constant::DAMPING * pars.pairing[rmem.material].beta_star[contacts.material[i]] * sqrt(Sn * contacts.mstar[i]);
-            vec3D Fnd = vreln * Fnd_scalar;
+            var_type Fnd_norm = constant::DAMPING * pars.pairing[rmem.material].beta_star[contacts.material[i]] * sqrt(Sn * contacts.mstar[i]);
+            vec3D Fnd = vn_rel * Fnd_norm;
 
             //tangential elastic force
-            vec3D Fte;
-            Fte = contacts.deltat[i] * (-St);
+            vec3D Fte = contacts.deltat[i] * (-St);
 
             //tangential damping force
-            var_type Ftd_scalar = constant::DAMPING * pars.pairing[rmem.material].beta_star[contacts.material[i]] * sqrt(St * contacts.mstar[i]);
-            vec3D Ftd = vrelt * Ftd_scalar;
+            var_type Ftd_norm = constant::DAMPING * pars.pairing[rmem.material].beta_star[contacts.material[i]] * sqrt(St * contacts.mstar[i]);
+            vec3D Ftd = vt_rel * Ftd_norm;
 
             //total normal and tangentional force
             vec3D Fn = Fne + Fnd;
             vec3D Ft = Fte + Ftd;
 
             //check for sliding
-            if(Ft.length() > Fn.length() * pars.pairing[rmem.material].mu0_star[contacts.material[i]])
+            var_type Ft_norm = Ft.length();
+            var_type Fn_norm = Fn.length();
+            if(Ft_norm > Fn_norm * pars.pairing[rmem.material].mu0_star[contacts.material[i]])
             {
                 //if sliding
-                Ft = Fn * pars.pairing[rmem.material].mu_star[contacts.material[i]];
+                Ft = Ft*(Fn_norm/Ft_norm * pars.pairing[rmem.material].mu_star[contacts.material[i]]);
             }
 
             //torque
-            vec3D M = contacts.p[i] ^ Ft;
+            vec3D M = (contacts.p[i] ^ Ft)*(constant::NUMBER_1);
+
+            //calculate rolling
+            if(RollingFriction)
+            {
+                var_type omegas_norm = omegas.length();
+                if(omegas_norm != constant::ZERO)
+                {
+                    vec3D omegas_unit = omegas * (constant::NUMBER_1 / omegas_norm);
+                    vec3D Mr = omegas_unit * (-pars.pairing[rmem.material].mur_star[contacts.material[i]] * Fn_norm * contacts.p[i].length());
+                    M = M + Mr;
+                }
+            }
 
             //force
             vec3D F = Fn + Ft;
-            if(Debug == 2)
-            {
-                printf(
-                "tid=%d \t Fn=(%7.3lf,%7.3lf,%7.3lf), Ft=(%7.3lf,%7.3lf,%7.3lf),  F=(%7.3lf,%7.3lf,%7.3lf)\n",
-                tid,
-                Fn.x,Fn.y,Fn.z,
-                Ft.x,Ft.y,Ft.z,
-                F.x,F.y,F.z);
-            }
 
             //add the force and torque to the total
             rmem.F.x += F.x;
@@ -139,7 +142,7 @@ namespace forceHandling
         var_type k = constant::ZERO;
         for(int i = 0; i < numberOfActiveParticles; i++)
         {
-            k += constant::NUMBER_05*particles.m[i]*(particles.v.x[i]*particles.v.x[i] + particles.v.y[i]*particles.v.y[i] + particles.v.z[i]*particles.v.z[i]);
+            k += constant::NUMBER_05*particles.m[i]*(particles.v.x[i]*particles.v.x[i] + particles.v.y[i]*particles.v.y[i] + particles.v.z[i]*particles.v.z[i]) + constant::NUMBER_05*particles.theta[i]*(particles.omega.x[i]*particles.omega.x[i] + particles.omega.y[i]*particles.omega.y[i] + particles.omega.z[i]*particles.omega.z[i]);
         }
         return k;
     }

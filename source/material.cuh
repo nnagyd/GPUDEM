@@ -16,6 +16,7 @@ struct materialContact
 {
     var_type mu_star[NumberOfMaterials];
     var_type mu0_star[NumberOfMaterials];
+    var_type mur_star[NumberOfMaterials];
     var_type E_star[NumberOfMaterials];
     var_type G_star[NumberOfMaterials];
     var_type beta_star[NumberOfMaterials];
@@ -39,8 +40,10 @@ struct materialParameters
     var_type e[NumberOfMaterials];
     ///Sliding friction coeff
     var_type mu[NumberOfMaterials];
-    ///Rolling friction coeff
+    ///Static friction coeff
     var_type mu0[NumberOfMaterials];
+    ///Rolling friction coeff
+    var_type mur[NumberOfMaterials];
     ///Damping
     var_type beta[NumberOfMaterials];
     ///Lookup table for material pairinga
@@ -100,16 +103,19 @@ namespace materialHandling
                 {
                     pars.pairing[i].mu_star[j] = min(pars.mu[i],pars.mu[j]);
                     pars.pairing[i].mu0_star[j] = min(pars.mu0[i],pars.mu0[j]);
+                    pars.pairing[i].mur_star[j] = min(pars.mur[i],pars.mur[j]);
                 }
                 if(friction == methods::Max)
                 {
                     pars.pairing[i].mu_star[j] = max(pars.mu[i],pars.mu[j]);
                     pars.pairing[i].mu0_star[j] = max(pars.mu0[i],pars.mu0[j]);
+                    pars.pairing[i].mur_star[j] = max(pars.mur[i],pars.mur[j]);
                 }                
                 if(friction == methods::Mean)
                 {
                     pars.pairing[i].mu_star[j] = constant::NUMBER_05*(pars.mu[i]+pars.mu[j]);
                     pars.pairing[i].mu0_star[j] = constant::NUMBER_05*(pars.mu0[i]+pars.mu0[j]);
+                    pars.pairing[i].mur_star[j] = constant::NUMBER_05*(pars.mur[i]+pars.mur[j]);
                 }
 
                 //------ calculate elastic parameters ------ 

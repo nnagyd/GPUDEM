@@ -43,7 +43,7 @@ __global__ void solver(struct particle particles, int numberOfActiveParticles, s
     int tid = threadIdx.x + blockIdx.x * blockDim.x;
 
     //possibility to not use all the particles in the simulation
-    if(tid > numberOfActiveParticles)
+    if(tid >= numberOfActiveParticles)
     {
         return;
     }

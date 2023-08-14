@@ -16,7 +16,6 @@
 #include "math.cuh"
 
 enum BoundaryConditionType {None, ReflectiveWall, HertzWall};
-enum Direction {East, West, North, South, Top, Bottom};
 
 /**
  * \brief Contains all the data about boundary conditions
@@ -99,57 +98,50 @@ namespace domainHandling
 
             if(d < rmem.R && d > -rmem.R) //particle and wall contact
             {
-                    //chech validity of contact if STLs are used
-                    bool contactValid = true;
-                    if(domainType == DomainType::STL)
-                    {   
-                        vec3D q = r - boundaryConditions.n[i]*d - boundaryConditions.p[i];
-                        var_type t = (q * boundaryConditions.t[i])*boundaryConditions.t_scale[i];
-                        var_type s = (q * boundaryConditions.s[i])*boundaryConditions.s_scale[i];
+                //chech validity of contact if STLs are used
+                bool contactValid = true;
+                if(domainType == DomainType::STL)
+                {   
+                    vec3D q = r - boundaryConditions.n[i]*d - boundaryConditions.p[i];
+                    var_type t = (q * boundaryConditions.t[i])*boundaryConditions.t_scale[i];
+                    var_type s = (q * boundaryConditions.s[i])*boundaryConditions.s_scale[i];
 
-                        /*if(tid == 0)
-                        {
-                            printf("d=%6.4lf  t=%6.4lf \t s=%6.4lf\n",d,t,s);
-                        }*/
+                    /*if(tid == 0)
+                    {
+                        printf("d=%6.4lf  t=%6.4lf \t s=%6.4lf\n",d,t,s);
+                    }*/
 
 
-                        if(t < constant::ZERO || s < constant::ZERO || t + s > constant::NUMBER_1)
-                        {
-                            contactValid = false;
-                        }
+                    if(t < constant::ZERO || s < constant::ZERO || t + s > constant::NUMBER_1)
+                    {
+                        contactValid = false;
                     }
+                }
 
-                    if(contactValid || domainType == DomainType::Rectangular)
+                if(contactValid || domainType == DomainType::Rectangular)
                     {
                     //normal and tangentional velocity
                     vec3D v(rmem.v.x,rmem.v.y,rmem.v.z);
-                    var_type vn_scalar = boundaryConditions.n[i] * v;
-                    vec3D vn = boundaryConditions.n[i] * (vn_scalar);
-                    vec3D vt = v - vn;
+                    vec3D omega(rmem.omega.x,rmem.omega.y,rmem.omega.z);
+                    vec3D v_rel = v + ((omega *rmem.R) ^ boundaryConditions.n[i]);
+                    var_type vn_rel_norm = boundaryConditions.n[i] * v_rel;
+                    vec3D vn_rel = boundaryConditions.n[i] * (vn_rel_norm);
+                    vec3D vt_rel = v_rel - vn_rel;
 
                     if(boundaryConditions.type[i] == BoundaryConditionType::ReflectiveWall)
                     {
                         //apply friction like velocity reduction
                         vec3D v_new;
-                        v_new = v - vt * boundaryConditions.beta[i];
+                        v_new = v - vt_rel * boundaryConditions.beta[i];
 
-                        if(vn_scalar > 0) //flip sign of the normal velocity 
+                        if(vn_rel_norm > 0) //flip sign of the normal velocity 
                         {
-                            v_new = v_new - vn * (2.0f * boundaryConditions.alpha[i]) ;
+                            v_new = v_new - vn_rel * (2.0f * boundaryConditions.alpha[i]) ;
                         }
 
                         rmem.v.x = v_new.x;
                         rmem.v.y = v_new.y;
                         rmem.v.z = v_new.z;
-
-                        if(Debug == 2)
-                        {
-                            printf("tid=%d, v_n=%6.2lf v=(%6.2lf,%6.2lf,%6.2lf)\n",
-                                tid,
-                                vn_scalar,
-                                v_new.x,v_new.y,v_new.z);
-                        }
-
 
                         //put particle on the wall - NOT PHYSICAL, SHOULD BE FIXED AT SOME POINT
                         vec3D dr = boundaryConditions.n[i] * (d - rmem.R);
@@ -166,7 +158,7 @@ namespace domainHandling
                         CalculateOverlap(tid,rmem,i,d,contacts);
 
                         //calculate new tangential overlap
-                        contacts.deltat[contacts.count] = contacts.deltat[contacts.count] + (vt * timestep.dt);
+                        contacts.deltat[contacts.count] = contacts.deltat[contacts.count] + (vt_rel * timestep.dt);
 
                         //contact position of contact
                         contacts.p[i] = boundaryConditions.n[i]*d;
@@ -177,37 +169,53 @@ namespace domainHandling
                         var_type St = constant::NUMBER_8 * pars.pairing[rmem.material].G_star[boundaryConditions.material[i]] * Rdelta;
 
                         //normal elastic force
-                        var_type Fne_scalar = constant::NUMBER_4o3 * pars.pairing[rmem.material].E_star[boundaryConditions.material[i]] * Rdelta * contacts.deltan[contacts.count];
-                        vec3D Fne = boundaryConditions.n[i]* (-Fne_scalar);
+                        var_type Fne_norm = constant::NUMBER_4o3 * pars.pairing[rmem.material].E_star[boundaryConditions.material[i]] * Rdelta * contacts.deltan[contacts.count];
+                        vec3D Fne = boundaryConditions.n[i]* (-Fne_norm);
 
                         //normal damping force
-                        var_type Fnd_scalar = constant::DAMPING * pars.pairing[rmem.material].beta_star[boundaryConditions.material[i]] * sqrt(Sn * rmem.m);
-                        vec3D Fnd = vn * Fnd_scalar;
+                        var_type Fnd_norm = constant::DAMPING * pars.pairing[rmem.material].beta_star[boundaryConditions.material[i]] * sqrt(Sn * rmem.m);
+                        vec3D Fnd = vn_rel * Fnd_norm;
 
                         //tangential elastic force
                         vec3D Fte;
                         Fte = contacts.deltat[contacts.count] * (-St);
 
                         //tangential damping force
-                        var_type Ftd_scalar = constant::DAMPING * pars.pairing[rmem.material].beta_star[boundaryConditions.material[i]] * sqrt(St * rmem.m);
-                        vec3D Ftd = vt * Ftd_scalar;
+                        var_type Ftd_norm = constant::DAMPING * pars.pairing[rmem.material].beta_star[boundaryConditions.material[i]] * sqrt(St * rmem.m);
+                        vec3D Ftd = vt_rel * Ftd_norm;
 
                         //total normal and tangentional force
                         vec3D Fn = Fne + Fnd;
                         vec3D Ft = Fte + Ftd;
 
                         //check for sliding
-                        if(Ft.length() > Fn.length() * pars.pairing[rmem.material].mu0_star[boundaryConditions.material[i]])
+                        var_type Ft_norm = Ft.length();
+                        var_type Fn_norm = Fn.length();
+                        if(Ft_norm > Fn_norm  * pars.pairing[rmem.material].mu0_star[boundaryConditions.material[i]])
                         {
                             //if sliding
-                            Ft = Fn * pars.pairing[rmem.material].mu_star[boundaryConditions.material[i]];
+                            Ft = Ft*(Fn_norm/Ft_norm * pars.pairing[rmem.material].mu_star[boundaryConditions.material[i]]);
                         }
 
                         //torque
                         vec3D M = contacts.p[i] ^ Ft;
 
+                        //calculate rolling
+                        if(RollingFriction)
+                        {
+                            var_type omega_norm = omega.length();
+                            if(omega_norm != constant::ZERO)
+                            {
+                                vec3D omega_unit = omega * (constant::NUMBER_1 / omega_norm);
+                                vec3D Mr = omega_unit * (-pars.pairing[rmem.material].mur_star[boundaryConditions.material[i]] * Fn_norm * contacts.p[i].length());
+                                M = M + Mr;
+                            }
+                        }
+
                         //force
                         vec3D F = Fn + Ft;
+                        //printf("Fne = %6.3lf \t Fnd = %8.6lf/%8.6lf \t vn = %6.3lf \t F = %6.3lf\n",
+                            //Fne.z,Fnd.z,Fnd_norm,v_rel.z,F.z);
 
                         //add the forces to the total
                         rmem.F.x += F.x;
@@ -224,6 +232,7 @@ namespace domainHandling
                             contacts.count = MaxContactNumber - 1;
                         }
                     }//end of Hertz Wall
+
                 }//end of valid contact
             }//end of if contact
         }//end of for through boundaries

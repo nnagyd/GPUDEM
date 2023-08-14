@@ -29,29 +29,29 @@ using var_type = float;
 */
 
 ///GPU settings
-constexpr int BlockSize = 16;
+constexpr int BlockSize = 64;
 
 /*
     ---------- Domain settings ----------
 */
 
 ///Number of boundary conditions
-constexpr int NumberOfBoundaries = 16;
+constexpr int NumberOfBoundaries = 5;
 
 ///Domain settings
 enum class DomainType { Rectangular, STL };
-constexpr DomainType domainType = DomainType::STL;
+constexpr DomainType domainType = DomainType::Rectangular;
 
 /*
     -------- Particle settings ----------
 */
 
 ///Number of particles in the simulation
-constexpr int NumberOfParticles = 2048;
-constexpr int MaxContactNumber = 16;
-constexpr int NumberOfMaterials = 2;
+constexpr int NumberOfParticles = 512;
+constexpr int MaxContactNumber = 12;
+constexpr int NumberOfMaterials = 1;
 
-///Particle initalization
+///Particle initalization DELETE FROM HERE
 enum class ParticleSizeDistribution { None, Uniform, Gauss };
 constexpr ParticleSizeDistribution particleSizeDistribution = ParticleSizeDistribution::Uniform;
 
@@ -65,6 +65,7 @@ constexpr ParticleVelocityDistribution particleVelocityDistribution = ParticleVe
 
 ///Body forces (gravity)
 constexpr bool BodyForce = true;
+constexpr bool RollingFriction = true;
 
 ///Contact model
 enum class ContactModel {Mindlin};
@@ -76,7 +77,7 @@ constexpr ContactSearch contactSearch = ContactSearch::BruteForce;
 
 ///Time integration
 enum class TimeIntegration {Euler, Exact, Adams2};
-constexpr TimeIntegration timeIntegration = TimeIntegration::Euler;
+constexpr TimeIntegration timeIntegration = TimeIntegration::Exact;
 
 ///Previous accelerations stores, acceleration of particle tid is stored at tid + n*NumberOfParticles
 constexpr int AccelerationStored = 1;
@@ -92,11 +93,11 @@ constexpr OutputFormat outputFormat = OutputFormat::ASCII;
 
 ///Save settings
 constexpr bool SaveVelocity = true;
-constexpr bool SaveAngularVelocity = false;
+constexpr bool SaveAngularVelocity = true;
 constexpr bool SaveForce = false;
 constexpr bool SaveTorque = false;
 constexpr bool SaveId = false;
-constexpr bool SaveMaterial = true;
+constexpr bool SaveMaterial = false;
 
 /*
     -------- Setting specifics ------------

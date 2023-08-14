@@ -366,6 +366,33 @@ namespace ioHandling
 
         return numParticles;
     }//end of read particles
+
+
+    int readParticlesCSV(struct particle particles, std::string location)
+    {
+        std::ifstream file(location);
+
+        if (!file.is_open())
+        {
+            std::cerr << "Error: Unable to open the file." << std::endl;
+            return -1;
+        }
+
+        std::string line;
+        int idx = 0;
+
+        while (std::getline(file, line))
+        {
+            std::istringstream iss(line);
+            iss >> particles.u.x[idx] >> particles.u.y[idx] >> particles.u.z[idx] >> particles.R[idx];
+            idx++;
+            if(idx>=NumberOfParticles) break;
+        }
+
+        file.close();
+
+        return idx;
+    }//end of read particles
 }
 
 #endif
