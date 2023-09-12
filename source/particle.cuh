@@ -3,7 +3,7 @@
  * @author Dániel NAGY
  * @version 1.0
  * @brief Particle and particle cloud discriptions 
- * @date 2023.07.20.
+ * @date 2023.09.12.
  * 
  * Device and host side instance of a particle
 */
@@ -125,7 +125,20 @@ struct particleDistribution
  */
 namespace particleHandling
 {
+    enum class ParticleSizeDistribution { None, Uniform, Gauss };
+    enum class ParticleVelocityDistribution { None, Uniform, Gauss };
 
+    /**
+    * \brief Fills up the particle struct p from a given material data
+    *
+    * @param p Pre-allocated memory where the particle data is saved
+    * @param pars Physical parameters given by the user
+    * @param mat_id Material ID 
+    * @param start_id Starting index of this material 
+    * @param end_id End index of this material 
+    *
+    * @return ensamble of particles according to the distribution described in pdist
+    */
     void generateParticleParameters(struct particle p, struct materialParameters pars, int mat_id, int start_id, int end_id)
     {
         for(int i = start_id; i < end_id; i++)
@@ -150,24 +163,25 @@ namespace particleHandling
     *
     * @param particles Pre-allocated memory where the particle data is saved
     * @param pdist Particle distribution information based on the particleDistribution struct
-    * @param pars  Physical parameters given by the user
+    * @param psize_dist Particle size distribuation chosen from the ParticleSizeDistribution enum
+    * @param pvel_dist Particle velocity distribuation chosen from the ParticleVelocityDistribution enum
     *
     * @return ensamble of particles according to the distribution described in pdist
     */
-    void generateParticleLocation(struct particle p, struct particleDistribution pdist)
+    void generateParticleLocation(struct particle p, struct particleDistribution pdist, ParticleSizeDistribution psize_dist, ParticleVelocityDistribution pvel_dist)
     {
         for(int i = 0; i < NumberOfParticles; i++)
         {
             //radius
-            if(particleSizeDistribution == ParticleSizeDistribution::None)
+            if(psize_dist == ParticleSizeDistribution::None)
             {
                 p.R[i] = pdist.Rmean;
             }
-            if(particleSizeDistribution == ParticleSizeDistribution::Uniform)
+            if(psize_dist == ParticleSizeDistribution::Uniform)
             {
                 p.R[i] = RandomGeneration::randomInRange(pdist.Rmean - pdist.Rsigma, pdist.Rmean + pdist.Rsigma);
             }
-            if(particleSizeDistribution == ParticleSizeDistribution::Gauss)
+            if(psize_dist == ParticleSizeDistribution::Gauss)
             {
                 //not implemented yet
             }
@@ -178,13 +192,13 @@ namespace particleHandling
             p.u.z[i] = RandomGeneration::randomInRange(pdist.min.z+p.R[i], pdist.max.z-p.R[i]);
         
             //velocity
-            if(particleVelocityDistribution == ParticleVelocityDistribution::None)
+            if(pvel_dist == ParticleVelocityDistribution::None)
             {
                 p.v.x[i] = pdist.vmean;
                 p.v.y[i] = pdist.vmean;
                 p.v.z[i] = pdist.vmean;
             }
-            if(particleVelocityDistribution == ParticleVelocityDistribution::Uniform)
+            if(pvel_dist == ParticleVelocityDistribution::Uniform)
             {
                 p.v.x[i] = RandomGeneration::randomInRange(pdist.vmean - pdist.vsigma, pdist.vmean + pdist.vsigma);
                 p.v.y[i] = RandomGeneration::randomInRange(pdist.vmean - pdist.vsigma, pdist.vmean + pdist.vsigma);
@@ -233,9 +247,6 @@ namespace particleHandling
             std::cout <<"\tM="<< std::setw(9) << p.M.x[i] << std::setw(9) << p.M.y[i] << std::setw(9) << p.M.z[i] << "\n";
         }
     }
-
-
-
 
 }//end of namespace
 

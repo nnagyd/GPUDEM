@@ -3,15 +3,15 @@
  * @author Dániel NAGY
  * @version 1.0
  * @brief Gravitational deposition in layers example
- * @date 2023.08.04.
+ * @date 2023.09.12.
  * 
  * This code simulates the deposition of N particles.
  * The particles are deposited in layers. Material data
- *  - R = 30mm ± 10mm
- *  - E = G = 20MPa
- *  - Rho = 1000 kg/m^3
- *  - mu =  0.5, mu0 = 0.7
- *  - beta = 1.5
+ *  - R = 40mm ± 10mm
+ *  - E = 2G = 200GPa
+ *  - Rho = 2000 kg/m^3
+ *  - mu =  0.5, mu0 = 0.7, mur = 0.02
+ *  - e  = 0.1
  * Domain
  *  - Layout = 2m x 2m
 */
@@ -23,7 +23,14 @@
 #include <string>
 #include <chrono>
 
+constexpr int NumberOfParticles = 8192;
+constexpr int NumberOfMaterials = 1;
+constexpr int NumberOfBoundaries = 5;
+
 #include "source/solver.cuh"
+
+int particlesPerLayer = 1024;
+int numberOfLayers = 8 + 1;
 
 
 int main(int argc, char const *argv[])
@@ -39,10 +46,6 @@ int main(int argc, char const *argv[])
     printf("#max.particles = %d\n",numBlocksPerSm*deviceProp.multiProcessorCount*BlockSize);
     cudaSetDevice(dev);
 
-    //particles per layer
-    int particlesPerLayer = 4096;
-    int numberOfLayers = 12 + 4;
-
     //set the initial particle distribution
     struct particleDistribution pdist;
     pdist.min.x = -1.0f;
@@ -52,24 +55,28 @@ int main(int argc, char const *argv[])
     pdist.min.z = 2.2f;
     pdist.max.z = 3.6f;
     pdist.vmean = 0.0f;
-    pdist.vsigma = 0.00f;
-    pdist.Rmean = 0.02f;
-    pdist.Rsigma = 0.005f;
+    pdist.vsigma= 0.00f;
+    pdist.Rmean = 0.04f;
+    pdist.Rsigma= 0.01f;
 
     //material parameters
-    struct materialParameters pars;
-    pars.rho=1000.0f;
-    pars.E = 20000.0f;
-    pars.G = 20000.0f;
-    pars.nu = 0.3f;
-    pars.beta = 20.0f;
-    pars.mu = 0.5f;
-    pars.mu0 = 0.7f;
+    struct materialParameters materials;
+    materials.rho[0] = 2000.0f;
+    materials.E[0]   = 2.0e8f;
+    materials.G[0]   = 1.0e8f;
+    materials.nu[0]  = 0.3f;
+    materials.e[0]   = 0.1f;
+    materials.mu[0]  = 0.5f;
+    materials.mu0[0] = 0.7f;
+    materials.mur[0] = 0.02f;
+
+    materialHandling::calculateMaterialContact(materials,materialHandling::methods::Min,materialHandling::methods::HarmonicMean,materialHandling::methods::HarmonicMean);
+    materialHandling::printMaterialInfo(materials,true);
 
     //timestep settings
-    float dt = 1e-4f;
-    float saves = 0.05f;
-    struct timestepping timestep(0.0f,1.0f,dt,saves);
+    float dt = 2e-4f;
+    int saves = 500;
+    struct timestepping timestep(0.0f,5.0f,dt,saves);
 
     //body forces
     struct bodyForce gravity;
@@ -88,14 +95,18 @@ int main(int argc, char const *argv[])
     {
         BCs.type[i] = BoundaryConditionType::ReflectiveWall; 
         BCs.alpha[i] =  0.6f; 
-        BCs.beta[i] = 0.04f;
+        BCs.beta[i] = 0.0f;
     }
 
     //particles, host side
     struct particle particlesH;
     memoryHandling::allocateHostParticles(particlesH);
-    particleHandling::generateParticleLocation(particlesH,pdist);
-    particleHandling::generateParticleParameters(particlesH,pars);
+    particleHandling::generateParticleLocation(
+        particlesH,
+        pdist,
+        particleHandling::ParticleSizeDistribution::Uniform,
+        particleHandling::ParticleVelocityDistribution::Uniform);
+    particleHandling::generateParticleParameters(particlesH,materials,0,0,NumberOfParticles);
 
     //particles, device side
     struct particle particlesD;
@@ -145,14 +156,13 @@ int main(int argc, char const *argv[])
             void *kernelArgs[] = {
                 (void*)&particlesD,
                 (void*)&numberOfActiveParticles,
-                (void*)&pars,
+                (void*)&materials,
                 (void*)&timestep,
                 (void*)&gravity,
                 (void*)&BCs,
                 (void*)&i
             };
             int GridSize = (numberOfActiveParticles + 1)/BlockSize;
-            //solver<<<GridSize,BlockSize>>>(particlesD,numberOfActiveParticles,pars,timestep,gravity,BCs,i);
             CHECK(cudaLaunchCooperativeKernel((void*)solver, GridSize, BlockSize, kernelArgs));
             CHECK(cudaDeviceSynchronize());
 

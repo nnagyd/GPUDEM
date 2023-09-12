@@ -33,8 +33,12 @@
     * @brief Kernel using the perThread approach
     * 
     * @param particles All the particle data
-    * @param domain All the settings about the domain of the calculation
-    * @param NumberOfTimesteps The number of timesteps done in a single call
+    * @param numberOfActiveParticles Number of currently active particles
+    * @param pars Material parameters 
+    * @param timestep Timestep settings 
+    * @param bodyForces Body forces (e.g. gravity)
+    * @param boundaryConditions Boundary conditions and types
+    * @param launch Number of the kernel launch
     * 
 */
 __global__ void solver(struct particle particles, int numberOfActiveParticles, struct materialParameters pars, struct timestepping timestep, struct bodyForce bodyForces, struct boundaryCondition boundaryConditions, int launch)

@@ -3,16 +3,9 @@
  * @author Dániel NAGY
  * @version 1.0
  * @brief Gravitational deposition example
- * @date 2023.08.04.
+ * @date 2023.09.12.
  * 
- * This code simulates the deposition of 8192 particles. 
- * The particles are stored in the particle8192_INIT.vtu input file
- *  - E = G = 20MPa
- *  - Rho = 1000 kg/m^3
- *  - mu =  0.5, mu0 = 0.7
- *  - beta = 1.5
- * Domain
- *  - Layout = 2m x 2m
+ * Validation with EDEM
 */
 
 
@@ -22,9 +15,11 @@
 #include <string>
 #include <chrono>
 
-#include "source/solver.cuh"
+constexpr int NumberOfParticles = 8192;
+constexpr int NumberOfMaterials = 1;
+constexpr int NumberOfBoundaries = 5;
 
-#define SQ2 0.7071067812f
+#include "source/solver.cuh"
 
 int main(int argc, char const *argv[])
 {
@@ -80,7 +75,7 @@ int main(int argc, char const *argv[])
     //particles, host side
     struct particle particlesH;
     memoryHandling::allocateHostParticles(particlesH);
-    int numberOfActiveParticles = ioHandling::readParticlesCSV(particlesH,"data/ex6_100.dat");
+    int numberOfActiveParticles = ioHandling::readParticlesCSV(particlesH,"data/ex6_40.dat");
     particleHandling::generateParticleParameters(particlesH,materials,0,0,NumberOfParticles);
 
     //particles, device side

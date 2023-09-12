@@ -3,7 +3,7 @@
  * @author Dániel NAGY
  * @version 1.0
  * @brief Contains the register struct
- * @date 2023.07.24.
+ * @date 2023.09.12.
  * 
  * This data is stored in the registers!
 */
@@ -13,6 +13,9 @@
 
 #include "particle.cuh"
 
+/**
+ * \brief Register memory, read at the beginning of the kernel and used throughout to store all the particle data locally
+*/
 struct registerMemory
 {
     //local copy of position
@@ -58,8 +61,18 @@ struct registerMemory
     int cid;
 };
 
+/**
+ * \brief Register handling functions
+*/
 namespace registerHandling{
 
+    /**
+     * @brief Copies the data from global memory to the registers
+     * 
+     * @param tid Thread index
+     * @param rmem Register memory
+     * @param particles Data about all the particles
+     */
     __device__ inline void fillRegisterMemory(int tid, struct registerMemory &rmem, struct particle particles)
     {
         //vectors
@@ -92,10 +105,18 @@ namespace registerHandling{
             rmem.beta[1].y = particles.beta.y[tid + NumberOfParticles];
             rmem.beta[1].z = particles.beta.z[tid + NumberOfParticles];
         }
-
-
     }
 
+    /**
+     * @brief Saves the necessary data to the registers
+     * 
+     * @param tid Thread index
+     * @param rmem Register memory
+     * @param particles Data about all the particles
+     * 
+     * Used after each timestep to save position, velocity and angular velocity
+     * since these are needed for the next contact calculations
+     */
     __device__ inline void endOfStepSync(int tid, struct registerMemory &rmem, struct particle particles)
     {
         //position
@@ -125,7 +146,15 @@ namespace registerHandling{
         
     }
 
-
+    /**
+     * @brief Saves the necessary data to the registers at the end of the kernel
+     * 
+     * @param tid Thread index
+     * @param rmem Register memory
+     * @param particles Data about all the particles
+     * 
+     * If forces or torques are saved they must be copied back to the global memory
+     */
     __device__ inline void endOfKernelSync(int tid, struct registerMemory &rmem, struct particle particles)
     {
         if(SaveForce)

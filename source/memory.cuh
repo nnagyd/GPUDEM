@@ -3,7 +3,7 @@
  * @author Dániel NAGY
  * @version 1.0
  * @brief Memory allocation and synchronization of host and device side
- * @date 2023.07.21.
+ * @date 2023.09.12.
  * 
  * Functions to synchronize data from H2D and D2H
 */
@@ -14,18 +14,16 @@
 #include "math.cuh"
 
 /**
- * \brief Memory handling namespace
+ * \brief Memory handling functions which copy between CPU and GPU and allocate memory
 */
 namespace memoryHandling
 {
-
     enum listOfVariables{ All, Position, Velocity, AngularVelocity, Acceleration, AngularAcceleration, Material, Radius, Force, Torque, CellID};
 
     /**
      * @brief Fills the host side for the particles with zeros
      * 
      * @param particlesH The particle struct which needs to be initalized
-     * 
      */
      void initializeHostParticles(struct particle &particlesH)
      {
@@ -65,12 +63,10 @@ namespace memoryHandling
      }
 
 
-
     /**
      * @brief Allocates the host side for the particles
      * 
      * @param particlesH The particle struct which needs memory allocation
-     * 
      */
     void allocateHostParticles(struct particle &particlesH)
     {
@@ -108,11 +104,11 @@ namespace memoryHandling
         initializeHostParticles(particlesH);
     }
 
+
     /**
      * @brief Free the hist side
      * 
      * @param particlesH The particle struct which is freed
-     * 
      */
      void freeHostParticles(struct particle &particlesH)
      {
@@ -151,7 +147,6 @@ namespace memoryHandling
      * @brief Allocates the device side for the particles
      * 
      * @param particlesD The particle struct which needs memory allocation
-     * 
      */
      void allocateDeviceParticles(struct particle &particlesD)
      {
@@ -192,7 +187,6 @@ namespace memoryHandling
     * @brief Allocates the device side for the particles
     * 
     * @param particlesD The particle struct which needs memory allocation
-    * 
     */
     void freeDeviceParticles(struct particle &particlesD)
     {
@@ -235,7 +229,6 @@ namespace memoryHandling
      * @param source Source of the data
      * @param vars Variables to copy according to the enum
      * @param kind cudaMemcpyDeviceToHost or HostToDevice
-     * 
      */
     void synchronizeParticles(struct particle dest, struct particle source, listOfVariables vars, cudaMemcpyKind kind)
     {

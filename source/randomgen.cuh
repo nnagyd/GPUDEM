@@ -4,7 +4,7 @@
  * @author Dániel NAGY
  * @version 1.0
  * @brief Random number generation 
- * @date 2023.07.20.
+ * @date 2023.09.12.
  * 
  * Random number generations implemented
 */
@@ -30,6 +30,16 @@
     void initializeRandomSeed()
     {
         srand(time(NULL));
+    }
+
+    /**
+    * \brief Initializes a random seed based on a given number
+    *
+    * @param seed seed of srand()
+    */
+    void initializeRandomSeed(int seed)
+    {
+        srand(seed);
     }
 
     /**

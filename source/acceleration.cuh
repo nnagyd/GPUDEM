@@ -3,7 +3,7 @@
  * @author Dániel NAGY
  * @version 1.0
  * @brief Calculates the acceleration
- * @date 2023.07.30.
+ * @date 2023.09.12.
  * 
  * Functions to do it
 */
@@ -15,15 +15,20 @@
 #include "timestep.cuh"
 #include "math.cuh"
 
+
+ /**
+ * \brief Acceleration handling of particles
+ */
 namespace accelerationHandling
 {
     /**
     * @brief Calculates the acceleration of the particles
     * 
     * @param tid Thread index
+    * @param rmem Register memory containg all the data about particle with index tid
     * @param particles Contains all the particle data 
     * 
-    * @return Particle accelerations are written in the particles struct
+    * @return Particle accelerations are written in the register memory rmem
     */
     __device__ void calculateDefault(int tid, struct registerMemory &rmem, struct particle particles)
     {
@@ -40,10 +45,11 @@ namespace accelerationHandling
     * @brief Modifies the acceleration with the body forces terms
     * 
     * @param tid Thread index
+    * @param rmem Register memory containg all the data about particle with index tid
     * @param particles Contains all the particle data 
     * @param bodyForces Contains all the information about the body forces
     * 
-    * @return Particle accelerations are written in the particles struct
+    * @return Particle accelerations are modified in the register memory rmem
     */
     __device__ void addBodyForces(int tid, struct registerMemory &rmem, struct particle particles, struct bodyForce bodyForces)
     {

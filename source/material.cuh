@@ -3,7 +3,7 @@
  * @author Dániel NAGY
  * @version 1.0
  * @brief Material description
- * @date 2023.07.21.
+ * @date 2023.09.12.
  * 
  * Struct to handle user given material parameters
 */
@@ -11,7 +11,9 @@
 #ifndef material_H
 #define material_H
 
-
+/**
+ * \brief Struct which contains the reduced quantities for material combinations
+ */
 struct materialContact
 {
     var_type mu_star[NumberOfMaterials];
@@ -24,7 +26,6 @@ struct materialContact
 
 /**
  * \brief Struct with all the user given material parameters, stored in the shared memory on the device side
- *
  */
 struct materialParameters
 {
@@ -51,11 +52,19 @@ struct materialParameters
 };
 
 
-
+/**
+ * \brief Contains all the function for material handling
+ */
 namespace materialHandling
 {
     enum methods {Min, Max, HarmonicMean, Mean};
 
+    /**
+    * @brief Prints all the materials and material combinations
+    * 
+    * @param pars materialParameters struct with ALL material parameters
+    * @param printPairings Settings to print the details of material pairings
+    */
     void printMaterialInfo(struct materialParameters pars, bool printPairings = false)
     {   
         for(int i = 0; i < NumberOfMaterials; i++)
@@ -85,6 +94,14 @@ namespace materialHandling
         }
     }
 
+    /**
+    * @brief Calculates all the material pairings and damping
+    * 
+    * @param pars materialParameters struct with ALL material parameters
+    * @param friction Method to calculate the friction coefficients
+    * @param elastic Method to calculate the elastic coefficients
+    * @param damping Method to calculate the damping coefficients
+    */
     void calculateMaterialContact(struct materialParameters &pars, methods friction, methods elastic, methods damping)
     {
         //calculate beta
@@ -170,10 +187,5 @@ namespace materialHandling
         }
     }
 }
-
-
-
-
-
 
 #endif

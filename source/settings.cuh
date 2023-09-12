@@ -3,7 +3,7 @@
  * @author Dániel NAGY
  * @version 1.0
  * @brief Simulation settings, user given 
- * @date 2023.07.20.
+ * @date 2023.09.12.
  * 
  * User given settings
 */
@@ -35,28 +35,16 @@ constexpr int BlockSize = 64;
     ---------- Domain settings ----------
 */
 
-///Number of boundary conditions
-constexpr int NumberOfBoundaries = 5;
-
 ///Domain settings
 enum class DomainType { Rectangular, STL };
-constexpr DomainType domainType = DomainType::Rectangular;
+constexpr DomainType domainType = DomainType::STL;
 
 /*
     -------- Particle settings ----------
 */
 
-///Number of particles in the simulation
-constexpr int NumberOfParticles = 512;
-constexpr int MaxContactNumber = 12;
-constexpr int NumberOfMaterials = 1;
-
-///Particle initalization DELETE FROM HERE
-enum class ParticleSizeDistribution { None, Uniform, Gauss };
-constexpr ParticleSizeDistribution particleSizeDistribution = ParticleSizeDistribution::Uniform;
-
-enum class ParticleVelocityDistribution { None, Uniform, Gauss };
-constexpr ParticleVelocityDistribution particleVelocityDistribution = ParticleVelocityDistribution::Uniform;
+///Maximum number of contacts
+constexpr int MaxContactNumber = 16;
 
 
 /*
@@ -97,7 +85,7 @@ constexpr bool SaveAngularVelocity = true;
 constexpr bool SaveForce = false;
 constexpr bool SaveTorque = false;
 constexpr bool SaveId = false;
-constexpr bool SaveMaterial = false;
+constexpr bool SaveMaterial = true;
 
 /*
     -------- Setting specifics ------------

@@ -3,14 +3,11 @@
  * @author Dániel NAGY
  * @version 1.0
  * @brief Gravitational deposition example
- * @date 2023.08.04.
+ * @date 2023.09.12.
  * 
- * This code simulates the deposition of 8192 particles. 
- * The particles are stored in the particle8192_INIT.vtu input file
- *  - E = G = 20MPa
- *  - Rho = 1000 kg/m^3
- *  - mu =  0.5, mu0 = 0.7
- *  - beta = 1.5
+ * This code simulates the deposition of a denser and a lighter material.
+ * The dense material has rho=1000kg/m3 and light material has rho=200kg/m3
+ *
  * Domain
  *  - Layout = 2m x 2m
 */
@@ -21,6 +18,10 @@
 #include <filesystem>
 #include <string>
 #include <chrono>
+
+constexpr int NumberOfParticles = 4096;
+constexpr int NumberOfMaterials = 3;
+constexpr int NumberOfBoundaries = 5;
 
 #include "source/solver.cuh"
 
@@ -36,14 +37,17 @@ int main(int argc, char const *argv[])
 
     //material parameters
     struct materialParameters materials;
-    materials.rho[0]= 300.0f;
+    //material 0
+    materials.rho[0]= 200.0f;
     materials.E[0] = 10000.0f;
     materials.G[0] = 10000.0f;
     materials.nu[0] = 0.3f;
     materials.e[0] = 0.001f;
     materials.mu[0] = 0.6f;
     materials.mu0[0] = 0.7f;
+    materials.mur[2] = 0.02f;
 
+    //material 2
     materials.rho[1]=1000.0f;
     materials.E[1] = 20000.0f;
     materials.G[1] = 20000.0f;
@@ -51,6 +55,16 @@ int main(int argc, char const *argv[])
     materials.e[1] = 0.002f;
     materials.mu[1] = 0.4f;
     materials.mu0[1] = 0.5f;
+    materials.mur[2] = 0.02f;
+
+    //wall
+    materials.E[2] = 200000.0f;
+    materials.G[2] = 200000.0f;
+    materials.nu[2] = 0.3f;
+    materials.e[2] = 0.002f;
+    materials.mu[2] = 0.7f;
+    materials.mu0[2] = 0.8f;
+    materials.mur[2] = 0.05f;
 
     materialHandling::calculateMaterialContact(materials,materialHandling::methods::Min,materialHandling::methods::HarmonicMean,materialHandling::methods::HarmonicMean);
     materialHandling::printMaterialInfo(materials,true);
@@ -65,13 +79,13 @@ int main(int argc, char const *argv[])
     pdist.max.z = 5.0f;
     pdist.vmean = 0.0f;
     pdist.vsigma = 0.00f;
-    pdist.Rmean = 0.04f;
+    pdist.Rmean = 0.05f;
     pdist.Rsigma = 0.01f;
 
     //timestep settings
     float dt = 1e-4f;
     float saves = 0.05f;
-    struct timestepping timestep(0.0f,50.0f,dt,saves);
+    struct timestepping timestep(0.0f,15.0f,dt,saves);
 
     //body forces
     struct bodyForce gravity;
@@ -88,15 +102,18 @@ int main(int argc, char const *argv[])
     BCs.n[4] = vec3D(0.0f, 1.0f,0.0f); BCs.p[4] = vec3D(0.0f, 1.0f,0.0f);
     for(int i = 0; i < NumberOfBoundaries; i++)
     {
-        BCs.type[i] = BoundaryConditionType::ReflectiveWall; 
-        BCs.alpha[i] =  0.8f; 
-        BCs.beta[i] = 0.003f;
+        BCs.type[i] = BoundaryConditionType::HertzWall; 
+        BCs.material[i] = 2;
     }
 
     //particles, host side
     struct particle particlesH;
     memoryHandling::allocateHostParticles(particlesH);
-    particleHandling::generateParticleLocation(particlesH,pdist);
+    particleHandling::generateParticleLocation(
+        particlesH,
+        pdist,
+        particleHandling::ParticleSizeDistribution::Uniform,
+        particleHandling::ParticleVelocityDistribution::Uniform);
     particleHandling::generateParticleParameters(particlesH,materials,0,0,NumberOfParticles/2);
     particleHandling::generateParticleParameters(particlesH,materials,1,NumberOfParticles/2,NumberOfParticles);
 
@@ -150,6 +167,21 @@ int main(int argc, char const *argv[])
             gravity.z = -12.0f;
         }
         if(i == 110)
+        {
+            gravity.x = 0.0f;
+            gravity.z = -9.81f;
+        }
+        if(i == 150)
+        {
+            gravity.x = 3.0f;
+            gravity.z = 12.0f;
+        }
+        if(i == 155)
+        {
+            gravity.x = -3.0f;
+            gravity.z = -12.0f;
+        }
+        if(i == 160)
         {
             gravity.x = 0.0f;
             gravity.z = -9.81f;

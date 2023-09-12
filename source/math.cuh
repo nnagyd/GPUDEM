@@ -3,17 +3,17 @@
  * @author Dániel NAGY
  * @version 1.0
  * @brief Math function
- * @date 2023.07.24.
+ * @date 2023.09.12.
  * 
  * Contains common functions
 */
-
 
 #ifndef math_H
 #define math_H
 
 #include <cmath>
 
+///CUDA Check macro
 #define CHECK(call) \
 { \
   const cudaError_t error = call; \
@@ -26,7 +26,7 @@
 }
 
 
-/* 
+/** 
  * \brief Contains all the constant
  */
 namespace constant
@@ -51,7 +51,9 @@ namespace constant
     constexpr var_type AM2C1 = 0.5;
 }
 
-
+/** 
+ * \brief 3D vector
+ */
 struct vector{
     var_type x;
     var_type y;
@@ -59,31 +61,31 @@ struct vector{
 
     __device__ __host__ vector(var_type x=constant::ZERO, var_type y=constant::ZERO, var_type z=constant::ZERO): x(x), y(y), z(z) {};
 
-    //addition
+    ///addition
     __device__ vector operator+(const vector& other) const 
     {
         return vector(x + other.x, y + other.y, z + other.z);
     }
 
-    //subtraction
+    ///subtraction
     __device__ __host__ vector operator-(const vector& other) const 
     {
         return vector(x - other.x, y - other.y, z - other.z);
     }
 
-    //dot product
+    ///dot product
     __device__ __host__ var_type operator*(const vector& other) const 
     {
         return x * other.x + y * other.y + z * other.z;
     }
 
-    //multiplication with scalar
+    ///multiplication with scalar
     __device__ __host__ vector operator*(var_type scalar) const 
     {
         return vector(x * scalar, y * scalar, z * scalar);
     }
 
-    //cross product
+    ///cross product
     __device__ __host__ vector operator^(const vector& other) const 
     {
         return vector(  y * other.z - z * other.y,
@@ -91,14 +93,13 @@ struct vector{
                         x * other.y - y * other.x );
     }
     
-    //length
+    ///length
     __device__ __host__ var_type length() const
     {
         return sqrt(x*x+y*y+z*z);
     }
-
-
 };
+
 
 typedef struct vector vec3D;
 

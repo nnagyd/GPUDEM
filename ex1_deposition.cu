@@ -3,14 +3,14 @@
  * @author Dániel NAGY
  * @version 1.0
  * @brief Gravitational deposition example
- * @date 2023.08.04.
+ * @date 2023.09.12.
  * 
  * This code simulates the deposition of N particles. Material data
- *  - R = 8mm ± 2mm
- *  - E = G = 20MPa
- *  - Rho = 1000 kg/m^3
- *  - mu =  0.5, mu0 = 0.7
- *  - beta = 1.5
+ *  - R = 60mm ± 2mm
+ *  - E = 2G = 200GPa
+ *  - Rho = 2000 kg/m^3
+ *  - mu =  0.5, mu0 = 0.7, mur = 0.02
+ *  - e  = 0.1
  * Domain
  *  - Layout = 2m x 2m
 */
@@ -21,6 +21,10 @@
 #include <filesystem>
 #include <string>
 #include <chrono>
+
+constexpr int NumberOfParticles = 2048;
+constexpr int NumberOfMaterials = 1;
+constexpr int NumberOfBoundaries = 5;
 
 #include "source/solver.cuh"
 
@@ -42,25 +46,29 @@ int main(int argc, char const *argv[])
     pdist.max.y =  1.0f;
     pdist.min.z = 0.5f;
     pdist.max.z = 5.0f;
-    pdist.vmean = 0.0f;
-    pdist.vsigma = 0.00f;
-    pdist.Rmean = 0.008f;
-    pdist.Rsigma = 0.002f;
+    pdist.vmean = 0.00f;
+    pdist.vsigma= 0.00f;
+    pdist.Rmean = 0.06f;
+    pdist.Rsigma= 0.03f;
 
     //material parameters
-    struct materialParameters pars;
-    pars.rho=1000.0f;
-    pars.E = 20000.0f;
-    pars.G = 20000.0f;
-    pars.nu = 0.3f;
-    pars.beta = 1.5f;
-    pars.mu = 0.5f;
-    pars.mu0 = 0.7f;
+    struct materialParameters materials;
+    materials.rho[0] = 2000.0f;
+    materials.E[0]   = 2.0e8f;
+    materials.G[0]   = 1.0e8f;
+    materials.nu[0]  = 0.3f;
+    materials.e[0]   = 0.1f;
+    materials.mu[0]  = 0.5f;
+    materials.mu0[0] = 0.7f;
+    materials.mur[0] = 0.02f;
+
+    materialHandling::calculateMaterialContact(materials,materialHandling::methods::Min,materialHandling::methods::HarmonicMean,materialHandling::methods::HarmonicMean);
+    materialHandling::printMaterialInfo(materials,true);
 
     //timestep settings
     float dt = 1e-4f;
-    float saves = 0.05f;
-    struct timestepping timestep(0.0f,5.0f,dt,saves);
+    int saves = 500;
+    struct timestepping timestep(0.0f,10.0f,dt,saves);
 
     //body forces
     struct bodyForce gravity;
@@ -79,14 +87,18 @@ int main(int argc, char const *argv[])
     {
         BCs.type[i] = BoundaryConditionType::ReflectiveWall; 
         BCs.alpha[i] =  0.8f; 
-        BCs.beta[i] = 0.02f;
+        BCs.beta[i] = 0.0f;
     }
 
     //particles, host side
     struct particle particlesH;
     memoryHandling::allocateHostParticles(particlesH);
-    particleHandling::generateParticleLocation(particlesH,pdist);
-    particleHandling::generateParticleParameters(particlesH,pars);
+    particleHandling::generateParticleLocation(
+        particlesH,
+        pdist,
+        particleHandling::ParticleSizeDistribution::Uniform,
+        particleHandling::ParticleVelocityDistribution::Uniform);
+    particleHandling::generateParticleParameters(particlesH,materials,0,0,NumberOfParticles);
 
     //particles, device side
     struct particle particlesD;
@@ -129,8 +141,16 @@ int main(int argc, char const *argv[])
         std::string name = output_folder + "/test_" + std::to_string(i) + ".vtu";
         ioHandling::saveParticlesVTK(NumberOfParticles,particlesH,name);
 
-        //solve
-        solver<<<GridSize,BlockSize>>>(particlesD,NumberOfParticles,pars,timestep,gravity,BCs,i);
+        void *kernelArgs[] = {
+            (void*)&particlesD,
+            (void*)&NumberOfParticles,
+            (void*)&materials,
+            (void*)&timestep,
+            (void*)&gravity,
+            (void*)&BCs,
+            (void*)&i
+        };
+        cudaLaunchCooperativeKernel((void*)solver, GridSize, BlockSize, kernelArgs);
         CHECK(cudaDeviceSynchronize());
 
         //copy D2H

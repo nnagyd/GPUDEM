@@ -3,9 +3,10 @@
  * @author Dániel NAGY
  * @version 1.0
  * @brief Description of the simulation domain
- * @date 2023.07.21.
+ * @date 2023.09.12.
  * 
- * Simulation domain (will be extended later)
+ * Contains the boundary description (STL or Rectangular) and the boundary 
+ * condition calculations
 */
 
 #ifndef domain_H
@@ -14,6 +15,7 @@
 #include "settings.cuh"
 #include "timestep.cuh"
 #include "math.cuh"
+
 
 enum BoundaryConditionType {None, ReflectiveWall, HertzWall};
 
@@ -56,10 +58,23 @@ struct boundaryCondition
     int material[NumberOfBoundaries];
 };
 
-
+/**
+ * \brief Handling of boundary conditions and STL files
+*/
 namespace domainHandling
 {
-    void __device__ CalculateOverlap(int tid, struct registerMemory &rmem, int i, var_type d, struct contact &contacts)
+    /**
+    * @brief Calculates the contact parameters between a particle and a boundary
+    * 
+    * @param tid Thread index of the particle
+    * @param rmem Register memory containing all the data about the particle
+    * @param i Index of the domain boundary, particle tid is in contact with
+    * @param d Distance between particle and domain boundary
+    * @param contacts List of contacts
+    * 
+    * @return the contact struct is filled up 
+    */
+    __device__ inline void CalculateOverlap(int tid, struct registerMemory &rmem, int i, var_type d, struct contact &contacts)
     {
         //data
         contacts.tid[contacts.count] = -i-1; //assign negative id-s for these contacts
@@ -88,6 +103,19 @@ namespace domainHandling
     }//end of calculateWallContact
 
 
+    /**
+    * @brief Calculates the forces based on the boundary constraints and given model
+    * 
+    * @param tid Thread index of the particle
+    * @param rmem Register memory containing all the data about the particle
+    * @param particles List of all particle data
+    * @param boundaryConditions List of all boundary condition data
+    * @param contacts List of all contact data
+    * @param pars All material parameters
+    * @param timestep Timestep specificiations
+    *
+    * 
+    */
     __device__ inline void applyBoundaryConditions(int tid, struct registerMemory &rmem, struct particle particles, struct boundaryCondition boundaryConditions, struct contact &contacts, struct materialParameters pars, struct timestepping timestep)
     {
         for(int i = 0; i < NumberOfBoundaries; i++)
@@ -105,12 +133,6 @@ namespace domainHandling
                     vec3D q = r - boundaryConditions.n[i]*d - boundaryConditions.p[i];
                     var_type t = (q * boundaryConditions.t[i])*boundaryConditions.t_scale[i];
                     var_type s = (q * boundaryConditions.s[i])*boundaryConditions.s_scale[i];
-
-                    /*if(tid == 0)
-                    {
-                        printf("d=%6.4lf  t=%6.4lf \t s=%6.4lf\n",d,t,s);
-                    }*/
-
 
                     if(t < constant::ZERO || s < constant::ZERO || t + s > constant::NUMBER_1)
                     {
@@ -214,8 +236,6 @@ namespace domainHandling
 
                         //force
                         vec3D F = Fn + Ft;
-                        //printf("Fne = %6.3lf \t Fnd = %8.6lf/%8.6lf \t vn = %6.3lf \t F = %6.3lf\n",
-                            //Fne.z,Fnd.z,Fnd_norm,v_rel.z,F.z);
 
                         //add the forces to the total
                         rmem.F.x += F.x;

@@ -13,21 +13,32 @@
 
 #include <iostream>
 
+/**
+ * \brief Timestep settings
+*/
 struct timestepping
 {
+    ///Start time of the simulation
     var_type starttime;
+    ///End time of the simulation
     var_type endtime;
+    ///Timestep size
     var_type dt;
+    ///Frequency of saves
     var_type savetime;
+    ///Number of steps in the simulation
     int numberOfSteps;
+    ///Number of steps between saves
     int saveSteps;
 
+    ///initialize based on the number of steps between saves
     timestepping(var_type start, var_type end, var_type dt, int saveSteps):starttime(start), endtime(end), dt(dt), saveSteps(saveSteps)
     {
         this->numberOfSteps = int((end - start) / dt) + 1;
         this->savetime = dt * saveSteps;
     }
 
+    ///initialize based on the time between saves
     timestepping(var_type start, var_type end, var_type dt, var_type savetime):starttime(start), endtime(end), dt(dt), savetime(savetime)
     {
         this->numberOfSteps = int((end - start) / dt) + 1;
@@ -35,8 +46,17 @@ struct timestepping
     }
 };
 
+/**
+ * \brief Functions for handling time
+*/
 namespace timeHandling
 {
+
+    /**
+     * @brief Prints the timestep settings
+     * 
+     * @param timestep The timestepping struct containg all data about the timesteps
+     */
     void printTimestepSettings(struct timestepping timestep)
     {
         std::cout << " Start: " << timestep.starttime << "\n";

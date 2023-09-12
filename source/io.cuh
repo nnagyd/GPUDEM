@@ -3,7 +3,7 @@
  * @author Dániel NAGY
  * @version 1.0
  * @brief Input-output handling
- * @date 2023.08.03.
+ * @date 2023.09.12.
  * 
  * Functions to do it
 */
@@ -19,15 +19,19 @@
 #include "material.cuh"
 #include "math.cuh"
 
+/**
+ * \brief Contains all the functions for writing and reading data
+ */
 namespace ioHandling
 {
-
     /**
     * \brief Save the data of a list of particles in a .particle textfile
     *
-    * @param particles A list of particles
+    * @param numberOfActiveParticles Number of active parameters
+    * @param particles List of particles
+    * @param location File location
     */
-    void saveParticles(struct particle particles, std::string location)
+    void saveParticles(int numberOfActiveParticles, struct particle particles, std::string location)
     {
         std::ofstream out(location);
         out.precision(7);
@@ -38,7 +42,7 @@ namespace ioHandling
         out.width(12); out << "v_y" << ","; 
         out.width(12); out << "v_z" << ","; 
         out.width(12); out << "size" << "\n"; 
-        for(int i = 0; i < NumberOfParticles; i++)
+        for(int i = 0; i < numberOfActiveParticles; i++)
         {
             out.width(12); out << particles.u.x[i] << ","; 
             out.width(12); out << particles.u.y[i] << ","; 
@@ -52,11 +56,12 @@ namespace ioHandling
         out.close();
     }
 
-
     /**
     * \brief Save the data of a list of particles as a vtk compatible .vtu unstructured grid file.
     *
-    * @param particles A list of particles
+    * @param numberOfActiveParticles Number of active parameters
+    * @param particles List of particles
+    * @param location File location
     *
     * File can be opened in paraview and the particles can be displayed using the Glyph filter
     */
@@ -82,7 +87,6 @@ namespace ioHandling
         out << "\t\t\t<Points>\n";
 
 
-
         //print points
         if(outputFormat == OutputFormat::ASCII)
         {
@@ -106,7 +110,6 @@ namespace ioHandling
             }
         }
         out << "\n\t\t\t\t</DataArray>\n";
-
 
 
         //print middle stuff
@@ -135,7 +138,6 @@ namespace ioHandling
         out << "\t\t\t<PointData Scalars=\"Radius\" Vectors=\"Velocity\">\n";
 
 
-
         //print radii
         out << "\t\t\t\t<!-- Particle radii -->\n";
         if(outputFormat == OutputFormat::ASCII)
@@ -157,7 +159,6 @@ namespace ioHandling
             }
             out << "\n\t\t\t\t</DataArray>\n";
         }
-
 
 
         //print velocity
@@ -185,7 +186,6 @@ namespace ioHandling
             }
             out << "\n\t\t\t\t</DataArray>\n";
         }
-
 
 
         //print angular velocity
@@ -249,6 +249,7 @@ namespace ioHandling
             out << "\n\t\t\t\t</DataArray>\n";
         }
 
+
         //print material
         out << "\t\t\t\t<!-- Particle materials -->\n";
         if(outputFormat == OutputFormat::ASCII && SaveMaterial)
@@ -268,12 +269,18 @@ namespace ioHandling
         out << "\t</UnstructuredGrid>\n";
         out << "</VTKFile>\n";
 
-
         out.flush();
         out.close();
     }
 
-
+    /**
+    * \brief Reads the particle data from a vtk compatible .vtu unstructured grid file.
+    *
+    * @param particles List of particles
+    * @param location File location
+    *
+    * @return Number of particles in the file
+    */
     int readParticlesVTK(struct particle particles, std::string location)
     {
         std::ifstream file(location);
@@ -323,7 +330,6 @@ namespace ioHandling
                         if (line.find("</DataArray>") != std::string::npos)
                             break;
 
-                        //std::cout << "idx=" << idx << "\t" << line << "\n";
                         std::istringstream iss(line);
                         iss >> particles.R[idx];
                         idx++;
@@ -367,7 +373,14 @@ namespace ioHandling
         return numParticles;
     }//end of read particles
 
-
+    /**
+    * \brief Reads the particle data from a .csv file.
+    *
+    * @param particles List of particles
+    * @param location File location
+    *
+    * @return Number of particles in the file
+    */
     int readParticlesCSV(struct particle particles, std::string location)
     {
         std::ifstream file(location);

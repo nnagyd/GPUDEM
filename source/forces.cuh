@@ -3,9 +3,9 @@
  * @author Dániel NAGY
  * @version 1.0
  * @brief Force calculations
- * @date 2023.07.24.
+ * @date 2023.09.12.
  * 
- * Different methods for force calculations
+ * Contains methods for force and energy calculations
 */
 
 #ifndef forces_H
@@ -17,7 +17,7 @@
 #include "timestep.cuh"
 
 /**
- * \brief Stores the constant body forces in the different directions
+ * \brief Stores the constant body forces (e.g. gravity) in the different directions
  */
 struct bodyForce
 {
@@ -29,17 +29,22 @@ struct bodyForce
     var_type z;
 };
 
+/**
+ * \brief Contains all the functions to calculate the force between particles
+ */
 namespace forceHandling
 {
     /**
     * @brief Calculates the force acting on the particle in x,y,z system using the Mindlin-Hertz theory
     * 
     * @param tid Thread index
+    * @param rmem Register memory containing all the data about the particle
     * @param particles The particles struct containing all the data about them
     * @param contacts The struct containing all the contacts
-    * @param pars The struct containing all the contacts
+    * @param pars The struct containing all the material parameters
+    * @param timestep Timestep settings
     * 
-    * @return Returns the force in x,y,z coordinate system
+    * @return Returns the force in x,y,z coordinate system (adds it to rmem)
     */
     __device__ inline void calculateForceMindlin(int tid, struct registerMemory &rmem, struct particle particles, struct contact contacts, struct materialParameters pars, struct timestepping timestep)
     {
@@ -136,6 +141,7 @@ namespace forceHandling
     * \brief Calculates the total kinetic energy
     *
     * @param particles A list of particles
+    * @param numberOfActiveParticles Number of active parameters
     */
     var_type calculateTotalKineticEnergy(struct particle particles, int numberOfActiveParticles)
     {
@@ -152,6 +158,7 @@ namespace forceHandling
      *
     * @param particles A list of particles
     * @param bodyForces Volumetric forces acting on the particles
+    * @param numberOfActiveParticles Number of active parameters
     */
     var_type calculateTotalPotentialEnergy(struct particle particles, struct bodyForce bodyForces, int numberOfActiveParticles)
     {

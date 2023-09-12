@@ -3,9 +3,13 @@
  * @author Dániel NAGY
  * @version 1.0
  * @brief Contact search algorithms
- * @date 2023.07.24.
+ * @date 2023.09.12.
  * 
- * Contains the contact search algorithms
+ * Contains the contact search algorithms. The following contact search 
+ * algorithms implemented:
+ * - BruteForce: calculates ALL possible contacts
+ * - DecomposedDomains: only calculates contact if in a neghbouring cell
+ * - DecomposedDomainsFast: EXPERIMENTAL
 */
 
 #ifndef contact_H
@@ -62,7 +66,7 @@ struct contact
  */
 namespace contactHandling
 {
-    //calculate neighbours on compile time
+    ///calculate neighbours on compile time
     __device__ constexpr int Neighbours[27] = {
         0, 1, -1, DecomposedDomainsConstants::Nx,    -DecomposedDomainsConstants::Nx, 
         DecomposedDomainsConstants::Nx*DecomposedDomainsConstants::Ny,          -DecomposedDomainsConstants::Nx*DecomposedDomainsConstants::Ny,
@@ -78,30 +82,38 @@ namespace contactHandling
         DecomposedDomainsConstants::Nx*(-1+DecomposedDomainsConstants::Ny)-1,   -DecomposedDomainsConstants::Nx*(-1+DecomposedDomainsConstants::Ny)-1
     };
 
+    /**
+    * \brief Checks if two cells are neighbours or not
+    *
+    * @param cid1 Cell id 1
+    * @param cid2 Cell id 2
+    *
+    * @return Returns if the cells are neighbours or not
+    */
     __device__ inline bool areNeighbours(int cid1, int cid2)
     {
         if( contactSearch == ContactSearch::DecomposedDomains )
         {
             if(cid1 == cid2 || cid1 == cid2 + Neighbours[1] || cid1 == cid2 + Neighbours[2] ||
-                cid2 + Neighbours[3] || cid1 == cid2 + Neighbours[4] ||
-                cid2 + Neighbours[5] || cid1 == cid2 + Neighbours[6] ||
-                cid2 + Neighbours[7] || cid1 == cid2 + Neighbours[8] ||
-                cid2 + Neighbours[9] || cid1 == cid2 + Neighbours[10] ||
-                cid2 + Neighbours[11] || cid1 == cid2 + Neighbours[12] ||
-                cid2 + Neighbours[13] || cid1 == cid2 + Neighbours[14] ||
-                cid2 + Neighbours[15] || cid1 == cid2 + Neighbours[16] ||
-                cid2 + Neighbours[17] || cid1 == cid2 + Neighbours[18] ||
-                cid2 + Neighbours[19] || cid1 == cid2 + Neighbours[20] ||
-                cid2 + Neighbours[21] || cid1 == cid2 + Neighbours[22] ||
-                cid2 + Neighbours[23] || cid1 == cid2 + Neighbours[24] ||
-                cid2 + Neighbours[25] || cid1 == cid2 + Neighbours[26] )
+                cid1 == cid2 + Neighbours[3] || cid1 == cid2 + Neighbours[4] ||
+                cid1 == cid2 + Neighbours[5] || cid1 == cid2 + Neighbours[6] ||
+                cid1 == cid2 + Neighbours[7] || cid1 == cid2 + Neighbours[8] ||
+                cid1 == cid2 + Neighbours[9] || cid1 == cid2 + Neighbours[10] ||
+                cid1 == cid2 + Neighbours[11] || cid1 == cid2 + Neighbours[12] ||
+                cid1 == cid2 + Neighbours[13] || cid1 == cid2 + Neighbours[14] ||
+                cid1 == cid2 + Neighbours[15] || cid1 == cid2 + Neighbours[16] ||
+                cid1 == cid2 + Neighbours[17] || cid1 == cid2 + Neighbours[18] ||
+                cid1 == cid2 + Neighbours[19] || cid1 == cid2 + Neighbours[20] ||
+                cid1 == cid2 + Neighbours[21] || cid1 == cid2 + Neighbours[22] ||
+                cid1 == cid2 + Neighbours[23] || cid1 == cid2 + Neighbours[24] ||
+                cid1 == cid2 + Neighbours[25] || cid1 == cid2 + Neighbours[26] )
                 return true;
             else return false;
         }
         if( contactSearch == ContactSearch::DecomposedDomainsFast )
         {
             if(cid1 == cid2 || cid1 == cid2 + Neighbours[1] || cid1 == cid2 + Neighbours[2] ||
-                cid2 + Neighbours[3] || cid1 == cid2 + Neighbours[4]  )
+                cid1 == cid2 + Neighbours[3] || cid1 == cid2 + Neighbours[4]  )
                 return true;
             else return false;
         }    
@@ -109,15 +121,17 @@ namespace contactHandling
 
 
     /**
-    * @brief Brute force contact search, which goes through all possible combinations 
+    * @brief Calculates the contact parameters between two particles 
     * 
     * @param tid Thread index of the particle
-    * @param x,y,z Coordinates of particle tid
+    * @param rmem Register memory containing all the data about the particle
     * @param i Thread index of the particle, particle tid is in contact with
     * @param d Distance between particles
+    * @param Rs Sum of radii of particle i and tid
     * @param particles All the particle data
-    * @param contacts List of particles we are in contact with
+    * @param contacts List of contacts
     * 
+    * @return the contact struct is filled up 
     */
     void __device__ CalculateContact(int tid, struct registerMemory &rmem, int i, var_type d, var_type Rs, struct particle particles, struct contact &contacts)
     {
@@ -171,6 +185,12 @@ namespace contactHandling
     }//end of calculateContact
 
 
+    /**
+    * @brief Prepares the contact struct for the next timestep by copying deltat into deltat_last for each contact.
+    * 
+    * @param tid Thread index of the particle
+    * @param contacts List of contacts
+    */
     void __device__ ResetContacts(int tid, struct contact &contacts)
     {
         //set last tid and deltat_t
@@ -185,12 +205,13 @@ namespace contactHandling
     }
 
     /**
-    * @brief Brute force contact search, which goes through all possible combinations 
+    * @brief Brute force contact search, which goes through all possible combinations and calculates all contacts
     * 
     * @param tid Thread index of the particle
+    * @param rmem Register memory containing all the data about the particle
+    * @param numberOfActiveParticles Number of active parameters
     * @param particles All the particle data
-    * @param contacts List of particles we are in contact with
-    * 
+    * @param contacts List of contacts
     */
     void __device__ BruteForceContactSearch(int tid, struct registerMemory &rmem, int numberOfActiveParticles, struct particle particles, struct contact &contacts)
     {
@@ -211,6 +232,8 @@ namespace contactHandling
     * @brief Calculates the cell id
     * 
     * @param tid Thread index of the particle
+    * @param rmem Register memory containing all the data about the particle
+    * @param numberOfActiveParticles Number of active parameters
     * @param particles All the particle data
     * 
     */
@@ -247,7 +270,15 @@ namespace contactHandling
 
     }//end of CalculateCellId
 
-
+    /**
+    * @brief Decomposed domains contact search, which checks if particles are in the same or neighbouring cells and calculates all contacts
+    * 
+    * @param tid Thread index of the particle
+    * @param rmem Register memory containing all the data about the particle
+    * @param numberOfActiveParticles Number of active parameters
+    * @param particles All the particle data
+    * @param contacts List of contacts
+    */
     void __device__ DecomposedDomainsContactSearch(int tid, struct registerMemory &rmem, int numberOfActiveParticles, struct particle particles, struct contact &contacts)
     {
         //go through all the particles
@@ -268,11 +299,12 @@ namespace contactHandling
 
 
     /**
-    * @brief Initializes the contacts struct
+    * @brief Initializes the contacts struct at the beginning of the solver kernel
     * 
     * @param tid Thread index of the particle
     * @param contacts List of particles we are in contact with
-    * 
+    *
+    * Initalizes tid with -1 and deltat with 0, resets contacts.count to 0
     */
     void __device__ initializeContacts(int tid, struct contact &contacts)
     {

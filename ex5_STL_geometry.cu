@@ -3,16 +3,10 @@
  * @author Dániel NAGY
  * @version 1.0
  * @brief Gravitational deposition example
- * @date 2023.08.04.
+ * @date 2023.09.12.
  * 
- * This code simulates the deposition of 8192 particles. 
- * The particles are stored in the particle8192_INIT.vtu input file
- *  - E = G = 20MPa
- *  - Rho = 1000 kg/m^3
- *  - mu =  0.5, mu0 = 0.7
- *  - beta = 1.5
- * Domain
- *  - Layout = 2m x 2m
+ * This code simulates the deposition of particles with special STL geometry.
+ *
 */
 
 
@@ -21,6 +15,10 @@
 #include <filesystem>
 #include <string>
 #include <chrono>
+
+constexpr int NumberOfParticles = 2048;
+constexpr int NumberOfMaterials = 2;
+constexpr int NumberOfBoundaries = 16;
 
 #include "source/solver.cuh"
 
@@ -44,6 +42,8 @@ int main(int argc, char const *argv[])
     materials.e[0] = 0.001f;
     materials.mu[0] = 0.6f;
     materials.mu0[0] = 0.7f;
+    materials.mur[0] = 0.03f;
+
     //walls
     materials.E[1] = 200000.0f;
     materials.G[1] = 200000.0f;
@@ -51,6 +51,7 @@ int main(int argc, char const *argv[])
     materials.e[1] = 0.1f;
     materials.mu[1] = 0.6f;
     materials.mu0[1] = 0.7f;
+    materials.mur[1] = 0.03f;
 
     materialHandling::calculateMaterialContact(materials,materialHandling::methods::Min,materialHandling::methods::HarmonicMean,materialHandling::methods::HarmonicMean);
     materialHandling::printMaterialInfo(materials,true);
@@ -71,7 +72,7 @@ int main(int argc, char const *argv[])
     //timestep settings
     float dt = 5e-5f;
     float saves = 0.05f;
-    struct timestepping timestep(0.0f,50.0f,dt,saves);
+    struct timestepping timestep(0.0f,10.0f,dt,saves);
 
     //body forces
     struct bodyForce gravity;
@@ -147,7 +148,11 @@ int main(int argc, char const *argv[])
     //particles, host side
     struct particle particlesH;
     memoryHandling::allocateHostParticles(particlesH);
-    particleHandling::generateParticleLocation(particlesH,pdist);
+    particleHandling::generateParticleLocation(
+        particlesH,
+        pdist,
+        particleHandling::ParticleSizeDistribution::Uniform,
+        particleHandling::ParticleVelocityDistribution::Uniform);
     particleHandling::generateParticleParameters(particlesH,materials,0,0,NumberOfParticles);
 
     //particles, device side

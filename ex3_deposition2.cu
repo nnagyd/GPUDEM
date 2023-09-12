@@ -3,13 +3,14 @@
  * @author Dániel NAGY
  * @version 1.0
  * @brief Gravitational deposition example
- * @date 2023.08.04.
+ * @date 2023.09.12.
  * 
- * This code simulates the deposition of 8192 particles. 
- * The particles are stored in the particle8192_INIT.vtu input file
+ * This code simulates the deposition of 8192 particles. The wall uses the Hertz
+ * model too.
+ * The particles are stored in the data/ex3_input.vtu input file.
  *  - E = G = 20MPa
  *  - Rho = 1000 kg/m^3
- *  - mu =  0.5, mu0 = 0.7
+ *  - mu =  0.5, mu0 = 0.7, mur = 0.02
  *  - beta = 1.5
  * Domain
  *  - Layout = 2m x 2m
@@ -21,6 +22,11 @@
 #include <filesystem>
 #include <string>
 #include <chrono>
+
+constexpr int NumberOfParticles = 8192;
+constexpr int NumberOfMaterials = 2;
+constexpr int NumberOfBoundaries = 5;
+
 
 #include "source/solver.cuh"
 
@@ -44,6 +50,7 @@ int main(int argc, char const *argv[])
     materials.e[0] = 0.1f;
     materials.mu[0] = 0.5f;
     materials.mu0[0] = 0.7f;
+    materials.mur[0] = 0.02f;
     //walls
     materials.E[1] = 200000.0f;
     materials.G[1] = 200000.0f;
@@ -51,15 +58,16 @@ int main(int argc, char const *argv[])
     materials.e[1] = 0.1f;
     materials.mu[1] = 0.6f;
     materials.mu0[1] = 0.7f;
+    materials.mur[1] = 0.02f;
 
     materialHandling::calculateMaterialContact(materials,materialHandling::methods::Min,materialHandling::methods::HarmonicMean,materialHandling::methods::HarmonicMean);
     materialHandling::printMaterialInfo(materials,true);
 
 
     //timestep settings
-    float dt = 2.5e-4f;
+    float dt = 1.0e-4f;
     float saves = 0.05f;
-    struct timestepping timestep(0.0f,50.0f,dt,saves);
+    struct timestepping timestep(0.0f,10.0f,dt,saves);
 
     //body forces
     struct bodyForce gravity;
@@ -112,17 +120,18 @@ int main(int argc, char const *argv[])
     auto startTime = std::chrono::high_resolution_clock::now();
     for(int i = 0; i < numberOfLaunches; i++)
     {
-        //print info
-        if(i%1==0)
-        {
-            std::cout << "Launch " << i << "\t/ " << numberOfLaunches << "\n";
-        }
         
         //save energy
         float K = forceHandling::calculateTotalKineticEnergy(particlesH,NumberOfParticles);
         float P = forceHandling::calculateTotalPotentialEnergy(particlesH,gravity,NumberOfParticles);
+
+        //print info
+        if(i%10==0)
+        {
+            std::cout << "Launch " << i << "\t/ " << numberOfLaunches << "\n";
+            std::cout << "K = " << K << "\t P = " << P << "\t T =" << K+P << "\n";
+        }
         energy << K << "\t" << P << "\t" << K+P << "\n";
-        std::cout << K << "\t" << P << "\t" << K+P << "\n";
 
         //save
         std::string name = output_folder + "/test_" + std::to_string(i) + ".vtu";
