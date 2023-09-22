@@ -19,7 +19,7 @@
 constexpr int Debug = 0;
 
 ///Use cooperative groups for GPU Wide synchronization (required for energy conservation)
-constexpr bool UseGPUWideThreadSync = true;
+constexpr bool UseGPUWideThreadSync = false;
 
 ///Variable type used in the code (float/double)
 using var_type = float;
@@ -29,7 +29,7 @@ using var_type = float;
 */
 
 ///GPU settings
-constexpr int BlockSize = 64;
+constexpr int BlockSize = 128;
 
 /*
     ---------- Domain settings ----------
@@ -39,12 +39,15 @@ constexpr int BlockSize = 64;
 enum class DomainType { Rectangular, STL };
 constexpr DomainType domainType = DomainType::STL;
 
+///Save the forces acting on the triangles
+constexpr bool SaveForcesTriangles = true;
+
 /*
     -------- Particle settings ----------
 */
 
 ///Maximum number of contacts
-constexpr int MaxContactNumber = 16;
+constexpr int MaxContactNumber = 10;
 
 
 /*
@@ -60,12 +63,12 @@ enum class ContactModel {Mindlin};
 constexpr ContactModel contactModel = ContactModel::Mindlin;
 
 ///Contact search algorithm
-enum class ContactSearch {BruteForce, DecomposedDomains, DecomposedDomainsFast, Balanced};
-constexpr ContactSearch contactSearch = ContactSearch::BruteForce;
+enum class ContactSearch {BruteForce, DecomposedDomains, DecomposedDomainsFast };
+constexpr ContactSearch contactSearch = ContactSearch::DecomposedDomains;
 
 ///Time integration
 enum class TimeIntegration {Euler, Exact, Adams2};
-constexpr TimeIntegration timeIntegration = TimeIntegration::Exact;
+constexpr TimeIntegration timeIntegration = TimeIntegration::Euler;
 
 ///Previous accelerations stores, acceleration of particle tid is stored at tid + n*NumberOfParticles
 constexpr int AccelerationStored = 1;
@@ -81,11 +84,11 @@ constexpr OutputFormat outputFormat = OutputFormat::ASCII;
 
 ///Save settings
 constexpr bool SaveVelocity = true;
-constexpr bool SaveAngularVelocity = true;
+constexpr bool SaveAngularVelocity = false;
 constexpr bool SaveForce = false;
 constexpr bool SaveTorque = false;
-constexpr bool SaveId = false;
-constexpr bool SaveMaterial = true;
+constexpr bool SaveId = true;
+constexpr bool SaveMaterial = false;
 
 /*
     -------- Setting specifics ------------
@@ -96,20 +99,23 @@ constexpr bool SaveMaterial = true;
 */
 namespace DecomposedDomainsConstants
 {
+    ///Dimension of mesh (1,2,3)
+    constexpr int Dimension = 1;
+
     ///Number of cell in x,y,z direction
-    constexpr int Nx = 100;
+    constexpr int Nx = 120;
     constexpr int Ny = 100;
-    constexpr int Nz = 200;
+    constexpr int Nz = 50;
 
     ///Min of coordinates
-    constexpr var_type minx = -1.0;
-    constexpr var_type miny = -1.0;
+    constexpr var_type minx = -0.5;
+    constexpr var_type miny = -0.3;
     constexpr var_type minz = 0.0;
 
     ///Max of coordinates
-    constexpr var_type maxx = 1.0;
-    constexpr var_type maxy = 1.0;
-    constexpr var_type maxz = 4.0;
+    constexpr var_type maxx = 0.5;
+    constexpr var_type maxy = 0.3;
+    constexpr var_type maxz = 0.2;
 
     ///DO NOT MODIFY - 1/max-min pre-calculated
     constexpr var_type NoverDx = var_type(Nx)/(maxx-minx);

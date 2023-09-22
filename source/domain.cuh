@@ -36,23 +36,20 @@ struct boundaryCondition
     //vector 2 of the traingle
     vec3D t[NumberOfBoundaries];
 
-    //pre-calculated 1/|t|^2
-    var_type t_scale[NumberOfBoundaries];
+    //force acting on the triangle
+    vec3D *F;
 
-    //pre-calculated 1/|s|^2
-    var_type s_scale[NumberOfBoundaries];
+    //torque acting on the triangle
+    vec3D *M;
 
     ///Type of BC
     BoundaryConditionType type[NumberOfBoundaries];
 
-    ///par1
+    /*///par1
     var_type alpha[NumberOfBoundaries];
 
     ///par2
-    var_type beta[NumberOfBoundaries];
-
-    ///par3
-    var_type gamma[NumberOfBoundaries];
+    var_type beta[NumberOfBoundaries];*/
 
     ///parameter set for materials
     int material[NumberOfBoundaries];
@@ -116,23 +113,23 @@ namespace domainHandling
     *
     * 
     */
-    __device__ inline void applyBoundaryConditions(int tid, struct registerMemory &rmem, struct particle particles, struct boundaryCondition boundaryConditions, struct contact &contacts, struct materialParameters pars, struct timestepping timestep)
+    __device__ inline void applyBoundaryConditions(int tid, struct registerMemory &rmem, struct particle particles, struct boundaryCondition &boundaryConditions, struct contact &contacts, struct materialParameters pars, struct timestepping timestep)
     {
         for(int i = 0; i < NumberOfBoundaries; i++)
         {
             //check for contact
             vec3D r(rmem.u.x,rmem.u.y,rmem.u.z);
-            var_type d = -1.0f * (boundaryConditions.n[i] * (r - boundaryConditions.p[i]));
+            vec3D rmp = r - boundaryConditions.p[i];
+            var_type d = -1.0f * (boundaryConditions.n[i] * rmp);
 
             if(d < rmem.R && d > -rmem.R) //particle and wall contact
             {
                 //chech validity of contact if STLs are used
                 bool contactValid = true;
                 if(domainType == DomainType::STL)
-                {   
-                    vec3D q = r - boundaryConditions.n[i]*d - boundaryConditions.p[i];
-                    var_type t = (q * boundaryConditions.t[i])*boundaryConditions.t_scale[i];
-                    var_type s = (q * boundaryConditions.s[i])*boundaryConditions.s_scale[i];
+                {  
+                    var_type t = boundaryConditions.t[i]*rmp;
+                    var_type s = boundaryConditions.s[i]*rmp;
 
                     if(t < constant::ZERO || s < constant::ZERO || t + s > constant::NUMBER_1)
                     {
@@ -140,8 +137,8 @@ namespace domainHandling
                     }
                 }
 
-                if(contactValid || domainType == DomainType::Rectangular)
-                    {
+                if(contactValid)
+                {
                     //normal and tangentional velocity
                     vec3D v(rmem.v.x,rmem.v.y,rmem.v.z);
                     vec3D omega(rmem.omega.x,rmem.omega.y,rmem.omega.z);
@@ -150,7 +147,7 @@ namespace domainHandling
                     vec3D vn_rel = boundaryConditions.n[i] * (vn_rel_norm);
                     vec3D vt_rel = v_rel - vn_rel;
 
-                    if(boundaryConditions.type[i] == BoundaryConditionType::ReflectiveWall)
+                    /*if(boundaryConditions.type[i] == BoundaryConditionType::ReflectiveWall)
                     {
                         //apply friction like velocity reduction
                         vec3D v_new;
@@ -172,7 +169,7 @@ namespace domainHandling
                         rmem.u.z += dr.z;
 
 
-                    }//end of if reflective wall
+                    }//end of if reflective wall*/
 
                     if(boundaryConditions.type[i] == BoundaryConditionType::HertzWall)
                     {
@@ -183,7 +180,7 @@ namespace domainHandling
                         contacts.deltat[contacts.count] = contacts.deltat[contacts.count] + (vt_rel * timestep.dt);
 
                         //contact position of contact
-                        contacts.p[i] = boundaryConditions.n[i]*d;
+                        contacts.p[contacts.count] = boundaryConditions.n[i]*d;
                         
                         //Stiffnesses
                         var_type Rdelta = sqrt(rmem.R*contacts.deltan[contacts.count]);
@@ -220,7 +217,7 @@ namespace domainHandling
                         }
 
                         //torque
-                        vec3D M = contacts.p[i] ^ Ft;
+                        vec3D M = contacts.p[contacts.count] ^ Ft;
 
                         //calculate rolling
                         if(RollingFriction)
@@ -229,7 +226,7 @@ namespace domainHandling
                             if(omega_norm != constant::ZERO)
                             {
                                 vec3D omega_unit = omega * (constant::NUMBER_1 / omega_norm);
-                                vec3D Mr = omega_unit * (-pars.pairing[rmem.material].mur_star[boundaryConditions.material[i]] * Fn_norm * contacts.p[i].length());
+                                vec3D Mr = omega_unit * (-pars.pairing[rmem.material].mur_star[boundaryConditions.material[i]] * Fn_norm * contacts.p[contacts.count].length());
                                 M = M + Mr;
                             }
                         }
@@ -245,6 +242,17 @@ namespace domainHandling
                         rmem.M.y += M.y;
                         rmem.M.z += M.z;
 
+                        if(SaveForcesTriangles)
+                        {
+                            //save the force acting on the boundary
+                            boundaryConditions.F[i].x += F.x;
+                            boundaryConditions.F[i].y += F.y;
+                            boundaryConditions.F[i].z += F.z;
+                            boundaryConditions.M[i].x += M.x;
+                            boundaryConditions.M[i].y += M.y;
+                            boundaryConditions.M[i].z += M.z;
+                        }
+
                         //check end
                         contacts.count++; 
                         if(contacts.count >= MaxContactNumber)
@@ -258,6 +266,107 @@ namespace domainHandling
         }//end of for through boundaries
     }//end of function
 
+
+    /**
+    * @brief Prints the boundary conditions
+    * 
+    * @param BC List of all boundary condition data
+    * @param printGeometry Prints geometric data
+    * @param printMaterial Prints material data
+    */
+    void printBoundaryConditions(struct boundaryCondition BC, bool printGeometry = true, bool printMaterial = true)
+    {
+        for(int i = 0; i < NumberOfBoundaries; i++)
+        {
+            if(printGeometry)
+            {
+                std::cout << "----- BC " << i << " ----- \n";
+                std::cout << "      p = (" << BC.p[i].x << "," << BC.p[i].y << "," << BC.p[i].z << ")\n"; 
+                std::cout << "      n = (" << BC.n[i].x << "," << BC.n[i].y << "," << BC.n[i].z << ")\n"; 
+                std::cout << "      s = (" << BC.s[i].x << "," << BC.s[i].y << "," << BC.s[i].z << ")\n"; 
+                std::cout << "      t = (" << BC.t[i].x << "," << BC.t[i].y << "," << BC.t[i].z << ")\n"; 
+            }
+            if(printMaterial)
+            {
+                std::cout << "   type = ";
+                switch(BC.type[i])
+                {
+                    case None: std::cout << "None\n"; break;
+                    /*case ReflectiveWall: 
+                        std::cout << "ReflectiveWall\n"; 
+                        std::cout << "   beta = " << BC.beta[i]<< "\n";
+                        std::cout << "  alpha = " << BC.alpha[i]<< "\n";
+                    break;*/
+                    case HertzWall: 
+                        std::cout << "HertzWall\n"; 
+                        std::cout << "material= " << BC.material[i] << "\n";
+                    break;
+                }
+            }
+        }//end of for
+    }//end of print
+
+    /**
+    * @brief Translates the boundary conditions and flips normal vectors
+    * 
+    * @param BC List of all boundary condition data
+    * @param startId startId in the BC struct of the boundaries
+    * @param printMaterial Prints material data
+    */
+    void translateBoundaryConditions(struct boundaryCondition &BC, int startId, int endId, var_type x, var_type y, var_type z, bool flipNormals = false)
+    {
+        for(int i = startId; i < endId; i++)
+        {
+            BC.p[i].x += x;
+            BC.p[i].y += y;
+            BC.p[i].z += z;
+
+            if(flipNormals)
+            {
+                BC.n[i].x *= - constant::NUMBER_1;
+                BC.n[i].y *= - constant::NUMBER_1;
+                BC.n[i].z *= - constant::NUMBER_1;
+            }
+        }//end of for
+    }//end of print
+
+
+    /**
+    * @brief Prints the boundary conditions
+    * 
+    * @param BCsH BCs on the host side
+    * @param BCsD BCs on the device side
+    */
+    void convertBoundaryConditions(struct boundaryCondition BCsH, struct boundaryCondition &BCsD)
+    {
+        for(int i = 0; i < NumberOfBoundaries; i++)
+        {
+            var_type detBeta = calculateDetBeta(BCsH.s[i],BCsH.t[i],BCsH.n[i]);
+            var_type overDetBeta = constant::NUMBER_1 / detBeta;
+            //vector n
+            BCsD.n[i] = BCsH.n[i];
+
+            //vector p
+            BCsD.p[i] = BCsH.p[i];
+
+            //vector s
+            BCsD.s[i].x = overDetBeta * (BCsH.n[i].z * BCsH.t[i].y - BCsH.n[i].y * BCsH.t[i].z );
+            BCsD.s[i].y = overDetBeta * (BCsH.n[i].x * BCsH.t[i].z - BCsH.n[i].z * BCsH.t[i].x );
+            BCsD.s[i].z = overDetBeta * (BCsH.n[i].y * BCsH.t[i].x - BCsH.n[i].x * BCsH.t[i].y );
+
+            //vector t
+            BCsD.t[i].x = overDetBeta * (BCsH.n[i].y * BCsH.s[i].z - BCsH.n[i].z * BCsH.s[i].y );
+            BCsD.t[i].y = overDetBeta * (BCsH.n[i].z * BCsH.s[i].x - BCsH.n[i].x * BCsH.s[i].z );
+            BCsD.t[i].z = overDetBeta * (BCsH.n[i].x * BCsH.s[i].y - BCsH.n[i].y * BCsH.s[i].x );
+
+            //other
+            BCsD.type[i] = BCsH.type[i];
+            /*BCsD.alpha[i] = BCsH.alpha[i];
+            BCsD.beta[i] = BCsH.beta[i];*/
+            BCsD.material[i] = BCsH.material[i];
+            
+        }//end of for
+    }//end of convert
 
 }//end of namespace
 

@@ -59,6 +59,21 @@ __global__ void solver(struct particle particles, int numberOfActiveParticles, s
     //create contacts
     struct contact contacts;
     contactHandling::initializeContacts(tid, contacts);
+
+    //reset the boundary forces
+    if(SaveForcesTriangles)
+    {
+        for(int j = 0; j < NumberOfBoundaries; j++)
+        {
+
+            boundaryConditions.F[j].x = constant::ZERO;
+            boundaryConditions.F[j].y = constant::ZERO;
+            boundaryConditions.F[j].z = constant::ZERO;
+            boundaryConditions.M[j].x = constant::ZERO;
+            boundaryConditions.M[j].y = constant::ZERO;
+            boundaryConditions.M[j].z = constant::ZERO;
+        }
+    }
     
     for(int i = launch*timestep.saveSteps; i < (launch+1)*timestep.saveSteps; i++)
     {
@@ -134,11 +149,12 @@ __global__ void solver(struct particle particles, int numberOfActiveParticles, s
         {
             __syncthreads();
         }
-
     }//end of timesteps
 
     //synchronize register data to global memory if data is saved
     registerHandling::endOfKernelSync(tid,rmem,particles);
+
+
     
 }//end of kernel
 

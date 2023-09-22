@@ -40,6 +40,7 @@ namespace constant
     constexpr var_type ZERO = 0.0;
     constexpr var_type NUMBER_04 = 0.4;
     constexpr var_type NUMBER_05 = 0.5;
+    constexpr var_type NUMBER_075 = 0.75;
     constexpr var_type NUMBER_4o3 = 4.0/3.0;
     constexpr var_type NUMBER_1 = 1.0;
     constexpr var_type NUMBER_2 = 2.0;
@@ -62,7 +63,7 @@ struct vector{
     __device__ __host__ vector(var_type x=constant::ZERO, var_type y=constant::ZERO, var_type z=constant::ZERO): x(x), y(y), z(z) {};
 
     ///addition
-    __device__ vector operator+(const vector& other) const 
+    __device__ __host__ vector operator+(const vector& other) const 
     {
         return vector(x + other.x, y + other.y, z + other.z);
     }
@@ -141,7 +142,19 @@ __device__ inline var_type calculateNormal(var_type v1, var_type v2, var_type v3
     return v1*n1 + v2*n2 + v3*n3;
 }
 
-
+/**
+    * \brief Calculate the determinant of the transformation matrix beta = (s,t,n)
+    *
+    * @param s Vector s of the STL triangle
+    * @param t Vector t of the STL triangle
+    * @param n Vector n of the STL triangle
+    *
+    * @return Returns the determinant of beta
+*/
+inline var_type calculateDetBeta(vec3D s, vec3D t, vec3D n)
+{
+    return -n.z*s.y*t.x + n.y*s.z*t.x + n.z*s.x*t.y - n.x*s.z*t.y - n.y*s.x*t.z + n.x*s.y*t.z;
+}
 
 
 #endif

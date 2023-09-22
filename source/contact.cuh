@@ -92,7 +92,7 @@ namespace contactHandling
     */
     __device__ inline bool areNeighbours(int cid1, int cid2)
     {
-        if( contactSearch == ContactSearch::DecomposedDomains )
+        if( contactSearch == ContactSearch::DecomposedDomains && DecomposedDomainsConstants::Dimension == 3)
         {
             if(cid1 == cid2 || cid1 == cid2 + Neighbours[1] || cid1 == cid2 + Neighbours[2] ||
                 cid1 == cid2 + Neighbours[3] || cid1 == cid2 + Neighbours[4] ||
@@ -110,6 +110,24 @@ namespace contactHandling
                 return true;
             else return false;
         }
+
+        if( contactSearch == ContactSearch::DecomposedDomains && DecomposedDomainsConstants::Dimension == 2)
+        {
+            if(cid1 == cid2 || cid1 == cid2 + Neighbours[1] || cid1 == cid2 + Neighbours[2] ||
+                cid1 == cid2 + Neighbours[3] || cid1 == cid2 + Neighbours[4] ||
+                cid1 == cid2 + Neighbours[7] || cid1 == cid2 + Neighbours[8] ||
+                cid1 == cid2 + Neighbours[9] || cid1 == cid2 + Neighbours[10] )
+                return true;
+            else return false;
+        }
+
+        if( contactSearch == ContactSearch::DecomposedDomains && DecomposedDomainsConstants::Dimension == 1)
+        {
+            if(cid1 == cid2 || cid1 == cid2 + Neighbours[1] || cid1 == cid2 + Neighbours[2])
+                return true;
+            else return false;
+        }
+
         if( contactSearch == ContactSearch::DecomposedDomainsFast )
         {
             if(cid1 == cid2 || cid1 == cid2 + Neighbours[1] || cid1 == cid2 + Neighbours[2] ||
@@ -244,26 +262,30 @@ namespace contactHandling
         {
             return;
         }
+        int Cx,Cy,Cz;
 
         //callculate cell coordinates
-        int Cx = int((rmem.u.x - DecomposedDomainsConstants::minx)*DecomposedDomainsConstants::NoverDx);
-        int Cy = int((rmem.u.y - DecomposedDomainsConstants::miny)*DecomposedDomainsConstants::NoverDy);
-        int Cz = int((rmem.u.z - DecomposedDomainsConstants::minz)*DecomposedDomainsConstants::NoverDz);
-
-        //apply cutoffs
+        Cx = int((rmem.u.x - DecomposedDomainsConstants::minx)*DecomposedDomainsConstants::NoverDx);
         if(Cx < 0) Cx = 0;
-        if(Cy < 0) Cy = 0;
-        if(Cz < 0) Cz = 0;
         if(Cx >= DecomposedDomainsConstants::Nx) Cx = DecomposedDomainsConstants::Nx-1;
-        if(Cy >= DecomposedDomainsConstants::Ny) Cy = DecomposedDomainsConstants::Ny-1;
-        if(Cz >= DecomposedDomainsConstants::Nz) Cz = DecomposedDomainsConstants::Nz-1;
+        rmem.cid = Cx;
 
-        rmem.cid = Cx + DecomposedDomainsConstants::Nx * Cy +  DecomposedDomainsConstants::Nx * DecomposedDomainsConstants::Ny * Cz;
-
-        if(Debug && tid==0)
+        if(DecomposedDomainsConstants::Dimension >= 2)
         {
-            printf("u=(%6.2lf,%6.2lf,%6.2lf)\t C=(%d,%d,%d)\t cid=%d\n",rmem.u.x,rmem.u.y,rmem.u.z,Cx,Cy,Cz,rmem.cid);
+            Cy = int((rmem.u.y - DecomposedDomainsConstants::miny)*DecomposedDomainsConstants::NoverDy);
+            if(Cy < 0) Cy = 0;
+            if(Cy >= DecomposedDomainsConstants::Ny) Cy = DecomposedDomainsConstants::Ny-1;
+            rmem.cid = Cx + DecomposedDomainsConstants::Nx * Cy;
         }
+
+        if(DecomposedDomainsConstants::Dimension >= 3)
+        {
+            Cz = int((rmem.u.z - DecomposedDomainsConstants::minz)*DecomposedDomainsConstants::NoverDz);
+            if(Cz < 0) Cz = 0;
+            if(Cz >= DecomposedDomainsConstants::Nz) Cz = DecomposedDomainsConstants::Nz-1;
+            rmem.cid = Cx + DecomposedDomainsConstants::Nx * Cy +  DecomposedDomainsConstants::Nx * DecomposedDomainsConstants::Ny * Cz;
+        }
+
 
         //write to global memory
         particles.cid[tid] = rmem.cid;
@@ -310,10 +332,14 @@ namespace contactHandling
     {
         for(int j = 0; j < MaxContactNumber; j++)
         {
-            contacts.tid[j] = -1;
+            contacts.tid[j] = -100000;
+            contacts.tid_last[j] = -110000;
             contacts.deltat[j].x = constant::ZERO;
             contacts.deltat[j].y = constant::ZERO;
             contacts.deltat[j].z = constant::ZERO;
+            contacts.deltat_last[j].x = constant::ZERO;
+            contacts.deltat_last[j].y = constant::ZERO;
+            contacts.deltat_last[j].z = constant::ZERO;
             contacts.count = 0;
         }
     }

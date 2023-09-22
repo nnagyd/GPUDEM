@@ -304,6 +304,38 @@ namespace memoryHandling
 
         CHECK(cudaDeviceSynchronize());
     }
+
+
+    /**
+     * @brief Allocates the device side for the boundary condition forces
+     * 
+     * @param BCsH The boundary condition struct on the host side
+     * @param BCsD The boundary condition struct on the device side
+     */
+     void allocateDeviceBoundary(struct boundaryCondition &BCsH, struct boundaryCondition &BCsD)
+     {
+        size_t memorySize = sizeof(vec3D) * NumberOfBoundaries;
+        cudaMalloc((void**)&BCsD.F, memorySize);
+        cudaMalloc((void**)&BCsD.M, memorySize);
+
+        BCsH.F = new vec3D[NumberOfBoundaries];
+        BCsH.M = new vec3D[NumberOfBoundaries];
+     }
+
+    /**
+     * @brief Copies the boundary forces to an array
+     * 
+     * @param BCsH The boundary condition struct on the host side
+     * @param BCsD The boundary condition struct on the device side
+     */
+     void synchronizeBoundary(struct boundaryCondition &BCsH, struct boundaryCondition &BCsD)
+     {
+        size_t memorySize = sizeof(vec3D) * NumberOfBoundaries;
+        cudaMemcpy(BCsH.F,BCsD.F,memorySize,cudaMemcpyDeviceToHost);
+        cudaMemcpy(BCsH.M,BCsD.M,memorySize,cudaMemcpyDeviceToHost);
+     }
+
+
 }//end of namespace
 
 

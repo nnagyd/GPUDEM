@@ -15,6 +15,7 @@
 #include <fstream>
 #include <iomanip>
 #include <string>
+#include <vector>
 #include "settings.cuh"
 #include "material.cuh"
 #include "math.cuh"
@@ -281,7 +282,7 @@ namespace ioHandling
     *
     * @return Number of particles in the file
     */
-    int readParticlesVTK(struct particle particles, std::string location)
+    int readParticlesVTK(struct particle particles, std::string location, int numberOfActiveParticles)
     {
         std::ifstream file(location);
 
@@ -333,7 +334,7 @@ namespace ioHandling
                         std::istringstream iss(line);
                         iss >> particles.R[idx];
                         idx++;
-                        if(idx>=NumberOfParticles) break;
+                        if(idx>=numberOfActiveParticles) break;
                     }
                 }
             }
@@ -381,7 +382,7 @@ namespace ioHandling
     *
     * @return Number of particles in the file
     */
-    int readParticlesCSV(struct particle particles, std::string location)
+    int readParticlesCSV(struct particle particles, std::string location, int numberOfActiveParticles)
     {
         std::ifstream file(location);
 
@@ -399,13 +400,174 @@ namespace ioHandling
             std::istringstream iss(line);
             iss >> particles.u.x[idx] >> particles.u.y[idx] >> particles.u.z[idx] >> particles.R[idx];
             idx++;
-            if(idx>=NumberOfParticles) break;
+            if(idx>=numberOfActiveParticles) break;
         }
 
         file.close();
 
         return idx;
     }//end of read particles
+
+    /**
+    * \brief Contains data from STL
+    */
+    struct Triangle {
+        float n[3];
+        float v1[3];
+        float v2[3];
+        float v3[3];
+        uint16_t attribute_byte_count;
+    };
+
+    /**
+    * \brief Reads an STL geometry and adds it to the BC struct
+    *
+    * @param BC List of boundary condition
+    * @param startId Index where the given STL file starts in the BC struct
+    * @param BCtype Type of the boundary condition defined by the STL
+    * @param materialId Material corresponding to the given STL
+    * @param scale Scaling the model up/down
+    * @param location File location
+    *
+    * @return Number of triangles in the file
+    */
+    int readGeometrySTL(struct boundaryCondition &BC, int startId, BoundaryConditionType BCtype, int materialId, var_type scale, std::string location)
+    {
+        std::ifstream file(location, std::ios::in);
+
+        if (!file.is_open()) {
+            std::cerr << "Error: Could not open the file" << std::endl;
+            return 1;
+        }
+    
+        //list of triangle
+        std::vector<Triangle> triangles;
+        std::string line;
+    
+        //skip the first line containing header information
+        for (int i = 0; i < 1; ++i) {
+            std::getline(file, line);
+        }
+    
+        //go through the file
+        while (std::getline(file, line)) 
+        {
+            //if file ended break
+            if(line.find("endsolid") != std::string::npos)
+            {
+                //end of file
+                break;
+            }
+
+            //initialize a triangle
+            Triangle triangle;
+            sscanf(line.c_str(), "facet normal %f %f %f", &triangle.n[0], &triangle.n[1], &triangle.n[2]);
+
+            //skip line with text "outer loop"
+            std::getline(file, line);
+            
+            //read vertices
+            for (int i = 0; i < 3; ++i) {
+                std::getline(file, line);
+                sscanf(line.c_str(), "vertex %f %f %f", &triangle.v1[i], &triangle.v2[i], &triangle.v3[i]);
+            }
+            
+            //skip line with text "endloop" and "endfacet"
+            std::getline(file, line);
+            std::getline(file, line);
+    
+            //add the triangle to the vector
+            triangles.push_back(triangle);
+        }
+    
+        file.close();
+    
+        // Process the triangle data
+        for (int i = 0; i < triangles.size(); i++) {
+
+            if(i + startId == NumberOfBoundaries) 
+            {
+                break;
+            }
+            /*printf("i=%d \tn=(%6.3lf,%6.3lf,%6.3lf)\tp=(%6.3lf,%6.3lf,%6.3lf)\n",
+                i,
+                triangles[i].n[0],triangles[i].n[1],triangles[i].n[2],
+                triangles[i].v1[0],triangles[i].v2[0],triangles[i].v3[0]);*/
+
+            //read the normal vector
+            BC.n[i+startId] = vec3D( triangles[i].n[0],triangles[i].n[1],triangles[i].n[2]);
+
+            //read the p vector
+            BC.p[i+startId] = vec3D( triangles[i].v1[0],triangles[i].v2[0],triangles[i].v3[0]);
+
+            //calculate s and t
+            BC.s[i+startId] = vec3D(    triangles[i].v1[1] - triangles[i].v1[0],
+                                        triangles[i].v2[1] - triangles[i].v2[0],
+                                        triangles[i].v3[1] - triangles[i].v3[0]);
+            BC.t[i+startId] = vec3D(    triangles[i].v1[2] - triangles[i].v1[0],
+                                        triangles[i].v2[2] - triangles[i].v2[0],
+                                        triangles[i].v3[2] - triangles[i].v3[0]);
+
+            //apply scaling
+            BC.p[i+startId] = BC.p[i+startId]*scale;
+            BC.s[i+startId] = BC.s[i+startId]*scale;
+            BC.t[i+startId] = BC.t[i+startId]*scale;
+
+            //set type and material
+            BC.material[i+startId] = materialId;
+            BC.type[i+startId] = BCtype;
+
+            /*printf("i=%d \tn=(%6.3lf,%6.3lf,%6.3lf)\tp=(%6.3lf,%6.3lf,%6.3lf)\n",
+                i,
+                BC.n[i+startId].x,BC.n[i+startId].y,BC.n[i+startId].z,
+                BC.p[i+startId].x,BC.p[i+startId].y,BC.p[i+startId].z);*/
+        }
+
+        return triangles.size();
+    }
+
+
+        /**
+    * \brief Reads an STL geometry and adds it to the BC struct
+    *
+    * @param BC List of boundary condition
+    * @param startId Index where the given STL file starts in the BC struct
+    * @param BCtype Type of the boundary condition defined by the STL
+    * @param materialId Material corresponding to the given STL
+    * @param scale Scaling the model up/down
+    * @param location File location
+    *
+    * @return Number of triangles in the file
+    */
+    void writeGeometrySTL(struct boundaryCondition &BC, int startId, int endId, std::string location)
+    {
+        std::ofstream file(location);
+
+        if (!file.is_open()) {
+            std::cerr << "Error: Could not open the file" << std::endl;
+            return;
+        }
+    
+        file << "solid DEMgeoFile" << std::endl;
+    
+        for(int i = startId; i < endId; i++)
+        {
+            file << "facet normal " << BC.n[i].x << " " << BC.n[i].y << " " << BC.n[i].z << "\n"; 
+            file << "outer loop\n"; 
+            file << "vertex " << BC.p[i].x << " " << BC.p[i].y << " " << BC.p[i].z << "\n"; 
+            file << "vertex " << BC.p[i].x + BC.t[i].x << " " << BC.p[i].y + BC.t[i].y << " " << BC.p[i].z + BC.t[i].z  << "\n"; 
+            file << "vertex " << BC.p[i].x + BC.s[i].x << " " << BC.p[i].y + BC.s[i].y << " " << BC.p[i].z + BC.s[i].z  << "\n";
+            file << "endloop\n"; 
+            file << "endfacet\n";  
+        }
+        
+        file << "endsolid DEMgeoFile" << std::endl;
+
+        file.flush();
+        file.close();
+
+        return;
+    }
 }
 
 #endif
