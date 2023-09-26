@@ -98,6 +98,12 @@ struct particle
 
     ///Particle cell id
     int *cid;
+
+    ///Stores the linked cell list
+    int * linkedCellList;
+
+    ///Number of particles in cell
+    int * NinCell;
 };
 
 /**

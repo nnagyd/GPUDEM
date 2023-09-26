@@ -29,7 +29,7 @@ using var_type = float;
 */
 
 ///GPU settings
-constexpr int BlockSize = 128;
+constexpr int BlockSize = 64;
 
 /*
     ---------- Domain settings ----------
@@ -37,17 +37,17 @@ constexpr int BlockSize = 128;
 
 ///Domain settings
 enum class DomainType { Rectangular, STL };
-constexpr DomainType domainType = DomainType::STL;
+constexpr DomainType domainType = DomainType::Rectangular;
 
 ///Save the forces acting on the triangles
-constexpr bool SaveForcesTriangles = true;
+constexpr bool SaveForcesTriangles = false;
 
 /*
     -------- Particle settings ----------
 */
 
 ///Maximum number of contacts
-constexpr int MaxContactNumber = 10;
+constexpr int MaxContactNumber = 16;
 
 
 /*
@@ -63,12 +63,12 @@ enum class ContactModel {Mindlin};
 constexpr ContactModel contactModel = ContactModel::Mindlin;
 
 ///Contact search algorithm
-enum class ContactSearch {BruteForce, DecomposedDomains, DecomposedDomainsFast };
-constexpr ContactSearch contactSearch = ContactSearch::DecomposedDomains;
+enum class ContactSearch {BruteForce, DecomposedDomains, DecomposedDomainsFast, LinkedCellList };
+constexpr ContactSearch contactSearch = ContactSearch::LinkedCellList;
 
 ///Time integration
 enum class TimeIntegration {Euler, Exact, Adams2};
-constexpr TimeIntegration timeIntegration = TimeIntegration::Euler;
+constexpr TimeIntegration timeIntegration = TimeIntegration::Exact;
 
 ///Previous accelerations stores, acceleration of particle tid is stored at tid + n*NumberOfParticles
 constexpr int AccelerationStored = 1;
@@ -87,7 +87,7 @@ constexpr bool SaveVelocity = true;
 constexpr bool SaveAngularVelocity = false;
 constexpr bool SaveForce = false;
 constexpr bool SaveTorque = false;
-constexpr bool SaveId = true;
+constexpr bool SaveId = false;
 constexpr bool SaveMaterial = false;
 
 /*
@@ -100,22 +100,26 @@ constexpr bool SaveMaterial = false;
 namespace DecomposedDomainsConstants
 {
     ///Dimension of mesh (1,2,3)
-    constexpr int Dimension = 1;
+    constexpr int Dimension = 3;
+
+    ///Number of particles in a cell
+    constexpr int NpCellMax = 16;
 
     ///Number of cell in x,y,z direction
-    constexpr int Nx = 120;
-    constexpr int Ny = 100;
-    constexpr int Nz = 50;
+    constexpr int Nx = 30;
+    constexpr int Ny = 30;
+    constexpr int Nz = 30;
+    constexpr int Ncell = Nx*Ny*Nz;
 
     ///Min of coordinates
-    constexpr var_type minx = -0.5;
-    constexpr var_type miny = -0.3;
+    constexpr var_type minx = -1.0;
+    constexpr var_type miny = -1.0;
     constexpr var_type minz = 0.0;
 
     ///Max of coordinates
-    constexpr var_type maxx = 0.5;
-    constexpr var_type maxy = 0.3;
-    constexpr var_type maxz = 0.2;
+    constexpr var_type maxx = 1.0;
+    constexpr var_type maxy = 1.0;
+    constexpr var_type maxz = 2.0;
 
     ///DO NOT MODIFY - 1/max-min pre-calculated
     constexpr var_type NoverDx = var_type(Nx)/(maxx-minx);

@@ -23,7 +23,7 @@
 #include <string>
 #include <chrono>
 
-constexpr int NumberOfParticles = 8192;
+constexpr int NumberOfParticles = 16384;
 constexpr int NumberOfMaterials = 2;
 constexpr int NumberOfBoundaries = 5;
 
@@ -37,37 +37,51 @@ int main(int argc, char const *argv[])
     int dev = 0;
     cudaDeviceProp deviceProp;
     cudaGetDeviceProperties(&deviceProp, dev);
+    //cudaFuncSetAttribute(solver, cudaFuncAttributePreferredSharedMemoryCarveout, 0);
     printf("Using Device %d: %s\n", dev, deviceProp.name);
     cudaSetDevice(dev);
+
+    //set the initial particle distribution
+    struct particleDistribution pdist;
+    pdist.min.x = -1.0f;
+    pdist.max.x =  1.0f;
+    pdist.min.y = -1.0f;
+    pdist.max.y =  1.0f;
+    pdist.min.z = 0.0f;
+    pdist.max.z = 2.0f;
+    pdist.vmean = 0.00f;
+    pdist.vsigma= 0.00f;
+    pdist.Rmean = 0.035f;
+    pdist.Rsigma= 0.005f;
 
     //material parameters
     struct materialParameters materials;
     //particles
     materials.rho[0]=1000.0f;
-    materials.E[0] = 20000.0f;
-    materials.G[0] = 20000.0f;
+    materials.E[0] = 2.0e5f;
+    materials.G[0] = 1.0e5f;
     materials.nu[0] = 0.3f;
     materials.e[0] = 0.1f;
-    materials.mu[0] = 0.5f;
+    materials.mu[0] = 0.6f;
     materials.mu0[0] = 0.7f;
-    materials.mur[0] = 0.02f;
+    materials.mur[0] = 0.05f;
     //walls
-    materials.E[1] = 200000.0f;
-    materials.G[1] = 200000.0f;
+    materials.E[1] = 2.0e8f;
+    materials.G[1] = 1.0e8f;
     materials.nu[1] = 0.3f;
     materials.e[1] = 0.1f;
-    materials.mu[1] = 0.6f;
-    materials.mu0[1] = 0.7f;
-    materials.mur[1] = 0.02f;
+    materials.mu[1] = 0.8f;
+    materials.mu0[1] = 0.9f;
+    materials.mur[1] = 0.2f;
 
     materialHandling::calculateMaterialContact(materials,materialHandling::methods::Min,materialHandling::methods::HarmonicMean,materialHandling::methods::HarmonicMean);
-    materialHandling::printMaterialInfo(materials,true);
+    //materialHandling::printMaterialInfo(materials,true);
 
 
     //timestep settings
     float dt = 1.0e-4f;
-    float saves = 0.05f;
-    struct timestepping timestep(0.0f,10.0f,dt,saves);
+    float saves = 5.0e-4f;
+    struct timestepping timestep(0.0f,2.5f,dt,saves);
 
     //body forces
     struct bodyForce gravity;
@@ -91,7 +105,12 @@ int main(int argc, char const *argv[])
     //particles, host side
     struct particle particlesH;
     memoryHandling::allocateHostParticles(particlesH);
-    ioHandling::readParticlesVTK(particlesH,"data/ex3_input.vtu");
+    particleHandling::generateParticleLocation(
+        particlesH,
+        pdist,
+        particleHandling::ParticleSizeDistribution::Uniform,
+        particleHandling::ParticleVelocityDistribution::Uniform);
+    //ioHandling::readParticlesVTK(particlesH,"data/ex3_input.vtu",NumberOfParticles);
     particleHandling::generateParticleParameters(particlesH,materials,0,0,NumberOfParticles);
 
     //particles, device side
@@ -120,22 +139,6 @@ int main(int argc, char const *argv[])
     auto startTime = std::chrono::high_resolution_clock::now();
     for(int i = 0; i < numberOfLaunches; i++)
     {
-        
-        //save energy
-        float K = forceHandling::calculateTotalKineticEnergy(particlesH,NumberOfParticles);
-        float P = forceHandling::calculateTotalPotentialEnergy(particlesH,gravity,NumberOfParticles);
-
-        //print info
-        if(i%10==0)
-        {
-            std::cout << "Launch " << i << "\t/ " << numberOfLaunches << "\n";
-            std::cout << "K = " << K << "\t P = " << P << "\t T =" << K+P << "\n";
-        }
-        energy << K << "\t" << P << "\t" << K+P << "\n";
-
-        //save
-        std::string name = output_folder + "/test_" + std::to_string(i) + ".vtu";
-        ioHandling::saveParticlesVTK(NumberOfParticles,particlesH,name);
 
         //solve
         void *kernelArgs[] = {
@@ -148,23 +151,40 @@ int main(int argc, char const *argv[])
             (void*)&i
         };
         cudaLaunchCooperativeKernel((void*)solver, GridSize, BlockSize, kernelArgs);
-
         //solver<<<GridSize,BlockSize>>>(particlesD,NumberOfParticles,materials,timestep,gravity,BCs,i);
         CHECK(cudaDeviceSynchronize());
 
-        //copy D2H
-        memoryHandling::synchronizeParticles(
-            particlesH,
-            particlesD,
-            memoryHandling::listOfVariables::Position,
-            cudaMemcpyDeviceToHost
-        );
-        memoryHandling::synchronizeParticles(
-            particlesH,
-            particlesD,
-            memoryHandling::listOfVariables::Velocity,
-            cudaMemcpyDeviceToHost
-        );
+        //print info
+        if(i%100==0)
+        {
+            //copy D2H
+            memoryHandling::synchronizeParticles(
+                particlesH,
+                particlesD,
+                memoryHandling::listOfVariables::Position,
+                cudaMemcpyDeviceToHost
+            );
+            memoryHandling::synchronizeParticles(
+                particlesH,
+                particlesD,
+                memoryHandling::listOfVariables::Velocity,
+                cudaMemcpyDeviceToHost
+            );
+
+            //save energy
+            float K = forceHandling::calculateTotalKineticEnergy(particlesH,NumberOfParticles);
+            float P = forceHandling::calculateTotalPotentialEnergy(particlesH,gravity,NumberOfParticles);
+
+            std::cout << "Launch " << i << "\t/ " << numberOfLaunches << "\n";
+            std::cout << "K = " << K << "\t P = " << P << "\t T =" << K+P << "\n";
+
+            energy << K << "\t" << P << "\t" << K+P << "\n";
+
+            //save
+            std::string name = output_folder + "/test_" + std::to_string(i) + ".vtu";
+            ioHandling::saveParticlesVTK(NumberOfParticles,particlesH,name);
+            
+        }
     }
     auto endTime = std::chrono::high_resolution_clock::now();
 

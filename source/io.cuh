@@ -337,6 +337,29 @@ namespace ioHandling
                         if(idx>=numberOfActiveParticles) break;
                     }
                 }
+
+                while (std::getline(file, line))
+                {
+                    if (line.find("<DataArray") != std::string::npos)
+                        break;
+                }
+                
+                
+                pos = line.find(">");
+                if (pos != std::string::npos)
+                {
+                    idx=0;
+                    while (std::getline(file, line))
+                    {
+                        if (line.find("</DataArray>") != std::string::npos)
+                            break;
+
+                        std::istringstream iss(line);
+                        iss >> particles.v.x[idx] >> particles.v.y[idx] >> particles.v.z[idx];
+                        idx++;
+                        if(idx>=NumberOfParticles) break;
+                    }
+                }
             }
 
             if (line.find("<Points>") != std::string::npos)
@@ -358,7 +381,9 @@ namespace ioHandling
                     while (std::getline(file, line))
                     {
                         if (line.find("</DataArray>") != std::string::npos)
+                        {
                             break;
+                        }
 
                         std::istringstream iss(line);
                         iss >> particles.u.x[idx] >> particles.u.y[idx] >> particles.u.z[idx];

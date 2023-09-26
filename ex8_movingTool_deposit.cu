@@ -16,16 +16,15 @@
 #include <string>
 #include <chrono>
 
-constexpr int NumberOfParticles = 131072;
+constexpr int NumberOfParticles = 147456;
 constexpr int NumberOfMaterials = 2;
 
-constexpr int sizeMoving = 0;
 constexpr int sizeWalls = 10;
-constexpr int NumberOfBoundaries = sizeMoving + sizeWalls;
+constexpr int NumberOfBoundaries = sizeWalls;
 
 
-int NumberOfActiveParticles = 32768;
-constexpr int ParticlesPerLayer = 32768;
+int NumberOfActiveParticles = 147456;
+constexpr int ParticlesPerLayer = 147456;
 
 #include "source/solver.cuh"
 
@@ -45,11 +44,11 @@ int main(int argc, char const *argv[])
     pdist.max.x =  0.5f;
     pdist.min.y = -0.35f;
     pdist.max.y =  0.35f;
-    pdist.min.z = 0.4f;
-    pdist.max.z = 2.2f;
+    pdist.min.z = 0.0f;
+    pdist.max.z = 9.0f;
     pdist.vmean = 0.00f;
     pdist.vsigma= 0.00f;
-    pdist.Rmean = 4.6e-3f;
+    pdist.Rmean = 4.4e-3f;
     pdist.Rsigma= 0.8e-3f;
 
     //material parameters
@@ -77,7 +76,7 @@ int main(int argc, char const *argv[])
 
     //timestep settings
     float dt = 1.0e-4f;
-    float saves = 0.05f;
+    float saves = 0.01f;
     struct timestepping timestep(0.0f,20.0f,dt,saves);
 
     //body forces
@@ -91,20 +90,55 @@ int main(int argc, char const *argv[])
     struct boundaryCondition BCsD;
 
     ioHandling::readGeometrySTL(BCsH,0,BoundaryConditionType::HertzWall,1,1.0f,"data/ex8_walls.stl");
-    ioHandling::readGeometrySTL(BCsH,sizeWalls,BoundaryConditionType::HertzWall,1,1.0f,"data/ex8_tool.stl");
-
-    domainHandling::translateBoundaryConditions(BCsH,sizeWalls,sizeWalls+sizeMoving,-2.6f,0.0f,0.2f,true);
     domainHandling::convertBoundaryConditions(BCsH,BCsD);
 
     //particles, host side
     struct particle particlesH;
     memoryHandling::allocateHostParticles(particlesH);
-    particleHandling::generateParticleLocation(
+    /*particleHandling::generateParticleLocation(
         particlesH,
         pdist,
         particleHandling::ParticleSizeDistribution::Uniform,
-        particleHandling::ParticleVelocityDistribution::Uniform);
-    //ioHandling::readParticlesVTK(particlesH,"data/ex8_input_131k.vtu",NumberOfParticles);
+        particleHandling::ParticleVelocityDistribution::Uniform);*/
+    ioHandling::readParticlesVTK(particlesH,"data/ex8_input_147k3.vtu",NumberOfParticles);
+
+    std:: cout << "v = " << particlesH.v.x[0] << "\n";
+    //sort based on location z
+    /*for(int i = 0; i < NumberOfParticles - 1; i++)
+    {
+        if(i % 25000 == 0) printf("Sorted: %d\n",i);
+        for(int j = 0; j < NumberOfActiveParticles - 1 - i; j++)
+        {
+            if(particlesH.u.z[j] > particlesH.u.z[j+1])
+            {
+                float x,y,z,R;
+                x = particlesH.u.x[j];
+                y = particlesH.u.y[j];
+                z = particlesH.u.z[j];
+                vx = particlesH.u.x[j];
+                vy = particlesH.u.y[j];
+                vz = particlesH.u.z[j];
+                R = particlesH.R[j];
+
+                particlesH.u.x[j] = particlesH.u.x[j+1];
+                particlesH.u.y[j] = particlesH.u.y[j+1];
+                particlesH.u.z[j] = particlesH.u.z[j+1];
+                particlesH.v.x[j] = particlesH.v.x[j+1];
+                particlesH.v.y[j] = particlesH.v.y[j+1];
+                particlesH.v.z[j] = particlesH.v.z[j+1];
+                particlesH.R[j] = particlesH.R[j+1];
+
+                particlesH.u.x[j+1] = x;
+                particlesH.u.y[j+1] = y;
+                particlesH.u.z[j+1] = z;
+                particlesH.v.x[j+1] = vx;
+                particlesH.v.y[j+1] = vy;
+                particlesH.v.z[j+1] = vz;
+                particlesH.R[j+1] = R;
+            }
+        }
+    }*/
+
     particleHandling::generateParticleParameters(particlesH,materials,0,0,NumberOfParticles);
 
     //particles, device side
@@ -178,7 +212,7 @@ int main(int argc, char const *argv[])
         std::cout << "Launch " << i << "\t/ " << numberOfLaunches << "\n";
         std::cout << "K="<< K << "\t P=" << P << "\t T=" << K+P << "\n";
 
-        if(i > 0 && i%27 == 0)
+        if(i > 0 && i%12 == 0)
         {
             NumberOfActiveParticles += ParticlesPerLayer;
             if(NumberOfActiveParticles > NumberOfParticles) NumberOfActiveParticles = NumberOfParticles;

@@ -255,7 +255,7 @@ namespace contactHandling
     * @param particles All the particle data
     * 
     */
-    void __device__ CalculateCellId(int tid, struct registerMemory &rmem, int numberOfActiveParticles, struct particle particles)
+    void __device__ CalculateCellId(int tid, struct registerMemory &rmem, int numberOfActiveParticles, struct particle particles,cooperative_groups::grid_group allThreads)
     {
         //if particle is inactive
         if(tid >= numberOfActiveParticles)
@@ -290,6 +290,77 @@ namespace contactHandling
         //write to global memory
         particles.cid[tid] = rmem.cid;
 
+        if(UseGPUWideThreadSync)
+        {
+            allThreads.sync();
+        }
+        else
+        {
+            __syncthreads();
+        }
+
+    }//end of CalculateCellId
+
+    /**
+    * @brief Calculates the cell id for the linked cell algorithm
+    * 
+    * @param tid Thread index of the particle
+    * @param rmem Register memory containing all the data about the particle
+    * @param numberOfActiveParticles Number of active parameters
+    * @param particles All the particle data
+    * 
+    */
+    void __device__ CalculateCellIdLinkedCells(int tid, struct registerMemory &rmem, int numberOfActiveParticles, struct particle particles,cooperative_groups::grid_group allThreads)
+    {
+        //if particle is inactive
+        if(tid >= numberOfActiveParticles)
+        {
+            return;
+        }
+        int Cx,Cy,Cz;
+
+        //callculate cell coordinates
+        Cx = int((rmem.u.x - DecomposedDomainsConstants::minx)*DecomposedDomainsConstants::NoverDx);
+        Cy = int((rmem.u.y - DecomposedDomainsConstants::miny)*DecomposedDomainsConstants::NoverDy);
+        Cz = int((rmem.u.z - DecomposedDomainsConstants::minz)*DecomposedDomainsConstants::NoverDz);
+
+        //apply limits
+        if(Cx < 0) Cx = 0;
+        if(Cx >= DecomposedDomainsConstants::Nx) Cx = DecomposedDomainsConstants::Nx-1;
+        if(Cy < 0) Cy = 0;
+        if(Cy >= DecomposedDomainsConstants::Ny) Cy = DecomposedDomainsConstants::Ny-1;
+        rmem.cid = Cx;
+        if(Cz < 0) Cz = 0;
+        if(Cz >= DecomposedDomainsConstants::Nz) Cz = DecomposedDomainsConstants::Nz-1;
+
+        //calculate cell id
+        rmem.cid = Cx + DecomposedDomainsConstants::Nx * Cy +  DecomposedDomainsConstants::Nx * DecomposedDomainsConstants::Ny * Cz;
+
+        //write to global memory
+        particles.cid[tid] = rmem.cid;
+
+        //get the id in cell, and increment it
+        int idInCell = particles.NinCell[rmem.cid];
+        //printf("Cell = %d\t idInCell=%d\n",rmem.cid,idInCell);
+        particles.NinCell[rmem.cid] = particles.NinCell[rmem.cid] + 1;
+        if(particles.NinCell[rmem.cid] >= DecomposedDomainsConstants::NpCellMax) 
+        {
+            particles.NinCell[rmem.cid] = DecomposedDomainsConstants::NpCellMax - 1;
+        }
+
+        //save the particle in the linked cell list
+        particles.linkedCellList[rmem.cid*DecomposedDomainsConstants::NpCellMax + idInCell] = tid;
+
+
+        if(UseGPUWideThreadSync)
+        {
+            allThreads.sync();
+        }
+        else
+        {
+            __syncthreads();
+        }
+
     }//end of CalculateCellId
 
     /**
@@ -317,6 +388,41 @@ namespace contactHandling
                 }
             }
         }//end of for
+    }//end of brute force
+
+
+    /**
+    * @brief Decomposed domains contact search with linked cell lists, which checks if particles are in the same or neighbouring cells and calculates only these contacts
+    * 
+    * @param tid Thread index of the particle
+    * @param rmem Register memory containing all the data about the particle
+    * @param numberOfActiveParticles Number of active parameters
+    * @param particles All the particle data
+    * @param contacts List of contacts
+    */
+    void __device__ LinkedCellListContactSearch(int tid, struct registerMemory &rmem, int numberOfActiveParticles, struct particle particles, struct contact &contacts)
+    {
+        //go through neighbouring cells
+        for(int i = 0; i < 27; i++)
+        {
+            //cell id of neighbour
+            int cid = rmem.cid + Neighbours[i];
+
+            if(cid >= 0 && cid < DecomposedDomainsConstants::Ncell)
+            {
+                for(int j = 0; j < particles.NinCell[cid]; j++)
+                {
+                    int idx = particles.linkedCellList[cid*DecomposedDomainsConstants::NpCellMax + j];
+
+                    var_type d = calculateDistance(rmem.u.x,rmem.u.y,rmem.u.z,particles.u.x[idx],particles.u.y[idx],particles.u.z[idx]);
+                    var_type Rs = rmem.R + particles.R[idx];
+                    if(d < Rs && tid != idx) //contact found
+                    {
+                        CalculateContact(tid,rmem,idx,d,Rs,particles,contacts);
+                    }
+                }
+            }
+        }
     }//end of brute force
 
 

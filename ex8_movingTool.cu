@@ -16,7 +16,7 @@
 #include <string>
 #include <chrono>
 
-constexpr int NumberOfParticles = 100032;
+constexpr int NumberOfParticles = 147456;
 constexpr int NumberOfMaterials = 2;
 
 constexpr int sizeMoving = 500;
@@ -62,7 +62,7 @@ int main(int argc, char const *argv[])
     //timestep settings
     float dt = 0.5e-4f;
     float saves = 0.0005f;
-    struct timestepping timestep(0.0f,10.0f,dt,saves);
+    struct timestepping timestep(0.0f,2.0f,dt,saves);
 
     //body forces
     struct bodyForce gravity;
@@ -83,7 +83,7 @@ int main(int argc, char const *argv[])
     //particles, host side
     struct particle particlesH;
     memoryHandling::allocateHostParticles(particlesH);
-    ioHandling::readParticlesVTK(particlesH,"data/ex8_input_100k.vtu");
+    ioHandling::readParticlesVTK(particlesH,"data/ex8_input_147k3.vtu",NumberOfParticles);
     particleHandling::generateParticleParameters(particlesH,materials,0,0,NumberOfParticles);
 
     //particles, device side
@@ -120,8 +120,12 @@ int main(int argc, char const *argv[])
         solver<<<GridSize,BlockSize>>>(particlesD,NumberOfParticles,materials,timestep,gravity,BCsD,i);
         CHECK(cudaDeviceSynchronize());
 
-        if(i % 10 == 0)
+
+
+        std::cout << "Launch " << i << "\t/ " << numberOfLaunches << "\n";
+        if(i % 50 == 0)
         {      
+            printf("SAVED! \n");
             //save
             std::string name = output_folder + "/test_" + std::to_string(i) + ".vtu";
             std::string name2 = output_folder + "/test_" + std::to_string(i) + ".stl";
@@ -147,8 +151,6 @@ int main(int argc, char const *argv[])
             float K = forceHandling::calculateTotalKineticEnergy(particlesH,NumberOfParticles);
             float P = forceHandling::calculateTotalPotentialEnergy(particlesH,gravity,NumberOfParticles);
             energy << K << "\t" << P << "\t" << K+P << "\n";
-
-            std::cout << "Launch " << i << "\t/ " << numberOfLaunches << "\n";
             std::cout << "K="<< K << "\t P=" << P << "\t T=" << K+P << "\n";
 
             //save force
@@ -162,7 +164,7 @@ int main(int argc, char const *argv[])
             }
             Fsum = Fsum * (1.0f / timestep.saveSteps);
             std::cout << "   F = (" << Fsum.x << "," << Fsum.y << "," << Fsum.z << ")\n";
-            std::cout << "   F = (" << Msum.x << "," << Msum.y << "," << Msum.z << ")\n";
+            std::cout << "   M = (" << Msum.x << "," << Msum.y << "," << Msum.z << ")\n";
         }
         
         if(true)

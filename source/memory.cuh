@@ -101,6 +101,13 @@ namespace memoryHandling
         particlesH.cid = new int[NumberOfParticles];
 
 
+        if(contactSearch == ContactSearch::LinkedCellList)
+        {
+            particlesH.NinCell = new int[DecomposedDomainsConstants::Ncell];
+            particlesH.linkedCellList = new int[DecomposedDomainsConstants::Ncell*DecomposedDomainsConstants::NpCellMax];
+        }
+
+
         initializeHostParticles(particlesH);
     }
 
@@ -141,6 +148,12 @@ namespace memoryHandling
         delete particlesH.theta_rec;
         delete particlesH.material;
         delete particlesH.cid;
+
+        if(contactSearch == ContactSearch::LinkedCellList)
+        {
+            delete particlesH.NinCell;
+            delete particlesH.linkedCellList;
+        }
      }
 
     /**
@@ -180,6 +193,12 @@ namespace memoryHandling
         cudaMalloc((void**)&particlesD.theta_rec, memorySize);
         cudaMalloc((void**)&particlesD.material, sizeof(int) * NumberOfParticles);
         cudaMalloc((void**)&particlesD.cid, sizeof(int) * NumberOfParticles);
+
+        if(contactSearch == ContactSearch::LinkedCellList)
+        {
+            cudaMalloc((void**)&particlesD.NinCell, sizeof(int) * DecomposedDomainsConstants::Ncell);
+            cudaMalloc((void**)&particlesD.linkedCellList, sizeof(int) * DecomposedDomainsConstants::Ncell*DecomposedDomainsConstants::NpCellMax);
+        }
      }
 
 
@@ -219,6 +238,12 @@ namespace memoryHandling
         cudaFree(particlesD.theta_rec);
         cudaFree(particlesD.material);
         cudaFree(particlesD.cid);
+
+        if(contactSearch == ContactSearch::LinkedCellList)
+        {
+            cudaFree(particlesD.NinCell);
+            cudaFree(particlesD.linkedCellList);
+        }
     }
 
 

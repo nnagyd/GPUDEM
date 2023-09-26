@@ -85,6 +85,20 @@ __global__ void solver(struct particle particles, int numberOfActiveParticles, s
         rmem.M.x = constant::ZERO;
         rmem.M.y = constant::ZERO;
         rmem.M.z = constant::ZERO;
+        //reset cells
+        if(contactSearch == ContactSearch::LinkedCellList)
+        {
+            int idx = tid;
+            while(idx < DecomposedDomainsConstants::Ncell * DecomposedDomainsConstants::NpCellMax)
+            {
+                if(idx < DecomposedDomainsConstants::Ncell)
+                {
+                    particles.NinCell[idx] = 0;
+                }
+                particles.linkedCellList[idx] = 0;
+                idx += numberOfActiveParticles;
+            }
+        }
 
         //1. boundary conditions 
         if(NumberOfBoundaries > 0)
@@ -99,8 +113,13 @@ __global__ void solver(struct particle particles, int numberOfActiveParticles, s
         }
         if(contactSearch == ContactSearch::DecomposedDomains || contactSearch == ContactSearch::DecomposedDomainsFast)
         {
-            contactHandling::CalculateCellId(tid,rmem,numberOfActiveParticles,particles);
+            contactHandling::CalculateCellId(tid,rmem,numberOfActiveParticles,particles,allThreads);
             contactHandling::DecomposedDomainsContactSearch(tid,rmem,numberOfActiveParticles,particles,contacts);
+        }
+        if(contactSearch == ContactSearch::LinkedCellList)
+        {
+            contactHandling::CalculateCellIdLinkedCells(tid,rmem,numberOfActiveParticles,particles,allThreads);
+            contactHandling::LinkedCellListContactSearch(tid,rmem,numberOfActiveParticles,particles,contacts);
         }
 
         //3. calculate forces
