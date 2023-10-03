@@ -103,7 +103,7 @@ struct particle
     int * linkedCellList;
 
     ///Number of particles in cell
-    int * NinCell;
+    unsigned int * NinCell;
 };
 
 /**

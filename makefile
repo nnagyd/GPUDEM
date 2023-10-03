@@ -1,7 +1,7 @@
 
 .PHONY: clean
 
-CompilerFlags = -O3 -std=c++17 -lineinfo -maxrregcount=128 --ptxas-options=-v --use_fast_math --gpu-architecture=sm_86
+CompilerFlags = -O3 -std=c++17 -lineinfo -maxrregcount=64 --ptxas-options=-v --use_fast_math --gpu-architecture=sm_86
 #CompilerFlags = -std=c++11 --gpu-architecture=sm_86
 
 all: gpudem
@@ -41,6 +41,26 @@ ex6:
 	nvcc -o GPUDEM_EX6 $(CompilerFlags) ex6_validation.cu
 	@echo -------------------------------- GPUDEM ready ------------------------------- 
 
+ex7:
+	@echo ---------------------------- Compiling Example 7 ---------------------------- 
+	nvcc -o GPUDEM_EX7 $(CompilerFlags) ex7_movingSTL.cu
+	@echo -------------------------------- GPUDEM ready ------------------------------- 
+
+ex7_2:
+	@echo ---------------------------- Compiling Example 7-2 ---------------------------- 
+	nvcc -o GPUDEM_EX7_2 $(CompilerFlags) ex7_movingSTL_deposit.cu
+	@echo -------------------------------- GPUDEM ready ------------------------------- 
+
+ex8:
+	@echo ---------------------------- Compiling Example 8 ---------------------------- 
+	nvcc -o GPUDEM_EX8 $(CompilerFlags) ex8_movingTool.cu
+	@echo -------------------------------- GPUDEM ready ------------------------------- 
+
+ex8_2:
+	@echo ---------------------------- Compiling Example 8_2 ---------------------------- 
+	nvcc -o GPUDEM_EX8_2 $(CompilerFlags) ex8_movingTool_deposit.cu
+	@echo -------------------------------- GPUDEM ready ------------------------------- 
+
 clean:
 	@echo ------------------------- Clening up GPUDEM Solver -------------------------- 
 	@if [ -e GPUDEM ]; then \
@@ -63,5 +83,17 @@ clean:
 	fi
 	@if [ -e GPUDEM_EX6 ]; then \
 		rm GPUDEM_EX6; \
+	fi
+	@if [ -e GPUDEM_EX7 ]; then \
+		rm GPUDEM_EX7; \
+	fi
+	@if [ -e GPUDEM_EX7_2 ]; then \
+		rm GPUDEM_EX7_2; \
+	fi
+	@if [ -e GPUDEM_EX8 ]; then \
+		rm GPUDEM_EX8; \
+	fi
+	@if [ -e GPUDEM_EX8_2 ]; then \
+		rm GPUDEM_EX8_2; \
 	fi
 	@echo ------------------------------- Cleanup ready ------------------------------- 

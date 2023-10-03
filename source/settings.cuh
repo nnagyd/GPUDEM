@@ -47,7 +47,7 @@ constexpr bool SaveForcesTriangles = false;
 */
 
 ///Maximum number of contacts
-constexpr int MaxContactNumber = 16;
+constexpr int MaxContactNumber = 12;
 
 
 /*
@@ -103,23 +103,23 @@ namespace DecomposedDomainsConstants
     constexpr int Dimension = 3;
 
     ///Number of particles in a cell
-    constexpr int NpCellMax = 16;
+    constexpr int NpCellMax = 8;
 
     ///Number of cell in x,y,z direction
-    constexpr int Nx = 30;
-    constexpr int Ny = 30;
-    constexpr int Nz = 30;
+    constexpr int Nx = 32;
+    constexpr int Ny = 32;
+    constexpr int Nz = 64;
     constexpr int Ncell = Nx*Ny*Nz;
 
     ///Min of coordinates
-    constexpr var_type minx = -1.0;
-    constexpr var_type miny = -1.0;
-    constexpr var_type minz = 0.0;
+    constexpr var_type minx = -1.12;
+    constexpr var_type miny = -1.12;
+    constexpr var_type minz = -0.01;
 
     ///Max of coordinates
-    constexpr var_type maxx = 1.0;
-    constexpr var_type maxy = 1.0;
-    constexpr var_type maxz = 2.0;
+    constexpr var_type maxx = 1.12;
+    constexpr var_type maxy = 1.12;
+    constexpr var_type maxz = 4.48;
 
     ///DO NOT MODIFY - 1/max-min pre-calculated
     constexpr var_type NoverDx = var_type(Nx)/(maxx-minx);

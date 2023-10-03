@@ -23,7 +23,7 @@
 #include <string>
 #include <chrono>
 
-constexpr int NumberOfParticles = 16384;
+constexpr int NumberOfParticles = 8192;
 constexpr int NumberOfMaterials = 2;
 constexpr int NumberOfBoundaries = 5;
 
@@ -48,10 +48,10 @@ int main(int argc, char const *argv[])
     pdist.min.y = -1.0f;
     pdist.max.y =  1.0f;
     pdist.min.z = 0.0f;
-    pdist.max.z = 2.0f;
+    pdist.max.z = 4.0f;
     pdist.vmean = 0.00f;
     pdist.vsigma= 0.00f;
-    pdist.Rmean = 0.035f;
+    pdist.Rmean = 0.03f;
     pdist.Rsigma= 0.005f;
 
     //material parameters
@@ -80,8 +80,8 @@ int main(int argc, char const *argv[])
 
     //timestep settings
     float dt = 1.0e-4f;
-    float saves = 5.0e-4f;
-    struct timestepping timestep(0.0f,2.5f,dt,saves);
+    float saves = 0.05f;
+    struct timestepping timestep(0.0f,2.5001f,dt,saves);
 
     //body forces
     struct bodyForce gravity;
@@ -140,8 +140,12 @@ int main(int argc, char const *argv[])
     for(int i = 0; i < numberOfLaunches; i++)
     {
 
+        //save
+        std::string name = output_folder + "/test_" + std::to_string(i) + ".vtu";
+        ioHandling::saveParticlesVTK(NumberOfParticles,particlesH,name);
+
         //solve
-        void *kernelArgs[] = {
+        /*void *kernelArgs[] = {
             (void*)&particlesD,
             (void*)&NumberOfParticles,
             (void*)&materials,
@@ -150,12 +154,12 @@ int main(int argc, char const *argv[])
             (void*)&BCs,
             (void*)&i
         };
-        cudaLaunchCooperativeKernel((void*)solver, GridSize, BlockSize, kernelArgs);
-        //solver<<<GridSize,BlockSize>>>(particlesD,NumberOfParticles,materials,timestep,gravity,BCs,i);
+        cudaLaunchCooperativeKernel((void*)solver, GridSize, BlockSize, kernelArgs);*/
+        solver<<<GridSize,BlockSize>>>(particlesD,NumberOfParticles,materials,timestep,gravity,BCs,i);
         CHECK(cudaDeviceSynchronize());
 
         //print info
-        if(i%100==0)
+        if(i%1==0)
         {
             //copy D2H
             memoryHandling::synchronizeParticles(
@@ -180,9 +184,6 @@ int main(int argc, char const *argv[])
 
             energy << K << "\t" << P << "\t" << K+P << "\n";
 
-            //save
-            std::string name = output_folder + "/test_" + std::to_string(i) + ".vtu";
-            ioHandling::saveParticlesVTK(NumberOfParticles,particlesH,name);
             
         }
     }

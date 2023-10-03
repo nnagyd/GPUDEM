@@ -15,9 +15,11 @@
 #include <string>
 #include <chrono>
 
-constexpr int NumberOfParticles = 8192;
+constexpr int NumberOfParticles = 8576;
 constexpr int NumberOfMaterials = 1;
 constexpr int NumberOfBoundaries = 5;
+
+constexpr int numberOfActiveParticles = 8519;
 
 #include "source/solver.cuh"
 
@@ -39,7 +41,7 @@ int main(int argc, char const *argv[])
     materials.e[0] = 0.5f;
     materials.mur[0] = 0.01f;
     materials.mu[0] = 0.5f;
-    materials.mu0[0] = 0.5f;
+    materials.mu0[0] = 0.01f;
 
     materialHandling::calculateMaterialContact(materials,
         materialHandling::methods::Min, //friction
@@ -75,8 +77,8 @@ int main(int argc, char const *argv[])
     //particles, host side
     struct particle particlesH;
     memoryHandling::allocateHostParticles(particlesH);
-    int numberOfActiveParticles = ioHandling::readParticlesCSV(particlesH,"data/ex6_40.dat");
-    particleHandling::generateParticleParameters(particlesH,materials,0,0,NumberOfParticles);
+    ioHandling::readParticlesCSV(particlesH,"data/ex6_40.dat",numberOfActiveParticles);
+    particleHandling::generateParticleParameters(particlesH,materials,0,0,numberOfActiveParticles);
 
     //particles, device side
     struct particle particlesD;
@@ -155,6 +157,10 @@ int main(int argc, char const *argv[])
             cudaMemcpyDeviceToHost
         );
     }
+    //save
+    std::string name = output_folder + "/test_" + std::to_string(numberOfLaunches) + ".vtu";
+    ioHandling::saveParticlesVTK(numberOfActiveParticles,particlesH,name);
+
     auto endTime = std::chrono::high_resolution_clock::now();
 
     auto duration = std::chrono::duration_cast<std::chrono::microseconds>(endTime - startTime).count();

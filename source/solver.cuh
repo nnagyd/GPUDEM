@@ -134,14 +134,14 @@ __global__ void solver(struct particle particles, int numberOfActiveParticles, s
         {
             accelerationHandling::addBodyForces(tid, rmem, particles, bodyForces);
         }
-        if(UseGPUWideThreadSync)
+        /*if(UseGPUWideThreadSync)
         {
             allThreads.sync();
         }
         else
         {
             __syncthreads();
-        }
+        }*/
         
 
         //5. timestepping 

@@ -125,6 +125,14 @@ __device__ inline var_type calculateDistance(var_type x1, var_type y1, var_type 
     return sqrt(dx*dx + dy*dy + dz*dz);
 }
 
+__device__ inline var_type calculateDistanceSquare(var_type x1, var_type y1, var_type z1, var_type x2, var_type y2, var_type z2)
+{
+    var_type dx = x1-x2;
+    var_type dy = y1-y2;
+    var_type dz = z1-z2;
+    return dx*dx + dy*dy + dz*dz;
+}
+
 /**
     * \brief Calculates the normal component of vector v using the unit vector n (pointing from particle 1 to particle 2)
     *

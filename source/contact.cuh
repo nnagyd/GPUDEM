@@ -153,14 +153,10 @@ namespace contactHandling
     */
     void __device__ CalculateContact(int tid, struct registerMemory &rmem, int i, var_type d, var_type Rs, struct particle particles, struct contact &contacts)
     {
-        //data
-        contacts.tid[contacts.count] = i;
-        contacts.Rstar[contacts.count] = constant::NUMBER_1/(rmem.R_rec + particles.R_rec[i]);
-        contacts.mstar[contacts.count] = constant::NUMBER_1/(rmem.m_rec + particles.m_rec[i]);
-        contacts.deltan[contacts.count] = Rs - d;
+        //check if they were contact in the last step
+        bool wasInContact = false;
 
-        //material of other
-        contacts.material[contacts.count] = particles.material[i];
+        contacts.deltan[contacts.count] = Rs - d;
 
         //contact position
         contacts.p[contacts.count].x = constant::NUMBER_05*(particles.u.x[i]-rmem.u.x);
@@ -173,25 +169,44 @@ namespace contactHandling
         contacts.r[contacts.count].y = dRec * (particles.u.y[i]-rmem.u.y);
         contacts.r[contacts.count].z = dRec * (particles.u.z[i]-rmem.u.z);
 
-        //check if they were contact in the last step
-        bool wasInContact = false;
-        for(int j = 0; j < MaxContactNumber; j++)
+        //if it was the same contact last time
+        if(i == contacts.tid_last[contacts.count]) //they were in contact the last time, exact same data
         {
-            if(i == contacts.tid_last[j]) //they were in contact the last time
+            wasInContact = true;
+        }
+        else
+        {
+            //calculate new parameters
+            contacts.tid[contacts.count] = i;
+            contacts.Rstar[contacts.count] = constant::NUMBER_1/(rmem.R_rec + particles.R_rec[i]);
+            contacts.mstar[contacts.count] = constant::NUMBER_1/(rmem.m_rec + particles.m_rec[i]);
+
+            //material of other
+            contacts.material[contacts.count] = particles.material[i];
+
+            for(int j = 0; j < MaxContactNumber; j++)
             {
-                wasInContact = true;
-                contacts.deltat[contacts.count].x = contacts.deltat_last[contacts.count].x;
-                contacts.deltat[contacts.count].y = contacts.deltat_last[contacts.count].y;
-                contacts.deltat[contacts.count].z = contacts.deltat_last[contacts.count].z;
+                if(i == contacts.tid_last[j]) //they were in contact the last time but with different index
+                {
+                    wasInContact = true;
+                    break;
+                }
             }
         }
 
-        //if they were not in contact then reset the tangential overlap
+        
+        //if they were not in contact then reset the tangential overlap and calculate new parameters otherwise refresh
         if(wasInContact == false)
         {
             contacts.deltat[contacts.count].x = constant::ZERO;
             contacts.deltat[contacts.count].y = constant::ZERO;
             contacts.deltat[contacts.count].z = constant::ZERO;
+        }
+        else
+        {
+            contacts.deltat[contacts.count].x = contacts.deltat_last[contacts.count].x;
+            contacts.deltat[contacts.count].y = contacts.deltat_last[contacts.count].y;
+            contacts.deltat[contacts.count].z = contacts.deltat_last[contacts.count].z;
         }
 
         //check end
@@ -340,13 +355,14 @@ namespace contactHandling
         particles.cid[tid] = rmem.cid;
 
         //get the id in cell, and increment it
-        int idInCell = particles.NinCell[rmem.cid];
+        int idInCell = atomicInc(&particles.NinCell[rmem.cid],DecomposedDomainsConstants::NpCellMax);
+
         //printf("Cell = %d\t idInCell=%d\n",rmem.cid,idInCell);
-        particles.NinCell[rmem.cid] = particles.NinCell[rmem.cid] + 1;
+        /*particles.NinCell[rmem.cid] = particles.NinCell[rmem.cid] + 1;
         if(particles.NinCell[rmem.cid] >= DecomposedDomainsConstants::NpCellMax) 
         {
             particles.NinCell[rmem.cid] = DecomposedDomainsConstants::NpCellMax - 1;
-        }
+        }*/
 
         //save the particle in the linked cell list
         particles.linkedCellList[rmem.cid*DecomposedDomainsConstants::NpCellMax + idInCell] = tid;
@@ -414,11 +430,11 @@ namespace contactHandling
                 {
                     int idx = particles.linkedCellList[cid*DecomposedDomainsConstants::NpCellMax + j];
 
-                    var_type d = calculateDistance(rmem.u.x,rmem.u.y,rmem.u.z,particles.u.x[idx],particles.u.y[idx],particles.u.z[idx]);
+                    var_type d_square = calculateDistanceSquare(rmem.u.x,rmem.u.y,rmem.u.z,particles.u.x[idx],particles.u.y[idx],particles.u.z[idx]);
                     var_type Rs = rmem.R + particles.R[idx];
-                    if(d < Rs && tid != idx) //contact found
+                    if(d_square < Rs*Rs && tid != idx) //contact found
                     {
-                        CalculateContact(tid,rmem,idx,d,Rs,particles,contacts);
+                        CalculateContact(tid,rmem,idx,sqrt(d_square),Rs,particles,contacts);
                     }
                 }
             }

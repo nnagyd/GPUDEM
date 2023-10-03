@@ -103,7 +103,7 @@ namespace memoryHandling
 
         if(contactSearch == ContactSearch::LinkedCellList)
         {
-            particlesH.NinCell = new int[DecomposedDomainsConstants::Ncell];
+            particlesH.NinCell = new unsigned int[DecomposedDomainsConstants::Ncell];
             particlesH.linkedCellList = new int[DecomposedDomainsConstants::Ncell*DecomposedDomainsConstants::NpCellMax];
         }
 
