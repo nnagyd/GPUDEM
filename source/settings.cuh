@@ -19,7 +19,7 @@
 constexpr int Debug = 0;
 
 ///Use cooperative groups for GPU Wide synchronization (required for energy conservation)
-constexpr bool UseGPUWideThreadSync = false;
+constexpr bool UseGPUWideThreadSync = true;
 
 ///Variable type used in the code (float/double)
 using var_type = float;
@@ -29,7 +29,7 @@ using var_type = float;
 */
 
 ///GPU settings
-constexpr int BlockSize = 64;
+constexpr int BlockSize = 128;
 
 /*
     ---------- Domain settings ----------
@@ -64,11 +64,11 @@ constexpr ContactModel contactModel = ContactModel::Mindlin;
 
 ///Contact search algorithm
 enum class ContactSearch {BruteForce, DecomposedDomains, DecomposedDomainsFast, LinkedCellList };
-constexpr ContactSearch contactSearch = ContactSearch::LinkedCellList;
+constexpr ContactSearch contactSearch = ContactSearch::BruteForce;
 
 ///Time integration
 enum class TimeIntegration {Euler, Exact, Adams2};
-constexpr TimeIntegration timeIntegration = TimeIntegration::Exact;
+constexpr TimeIntegration timeIntegration = TimeIntegration::Euler;
 
 ///Previous accelerations stores, acceleration of particle tid is stored at tid + n*NumberOfParticles
 constexpr int AccelerationStored = 1;
@@ -84,7 +84,7 @@ constexpr OutputFormat outputFormat = OutputFormat::ASCII;
 
 ///Save settings
 constexpr bool SaveVelocity = true;
-constexpr bool SaveAngularVelocity = false;
+constexpr bool SaveAngularVelocity = true;
 constexpr bool SaveForce = false;
 constexpr bool SaveTorque = false;
 constexpr bool SaveId = false;
