@@ -157,8 +157,6 @@ __global__ void solver(struct particle particles, int numberOfActiveParticles, s
 
     //synchronize register data to global memory if data is saved
     registerHandling::endOfKernelSync(tid,rmem,particles);
-
-
     
 }//end of kernel
 

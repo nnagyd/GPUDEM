@@ -37,10 +37,10 @@ constexpr int BlockSize = 128;
 
 ///Domain settings
 enum class DomainType { Rectangular, STL };
-constexpr DomainType domainType = DomainType::Rectangular;
+constexpr DomainType domainType = DomainType::STL;
 
 ///Save the forces acting on the triangles
-constexpr bool SaveForcesTriangles = false;
+constexpr bool SaveForcesTriangles = true;
 
 /*
     -------- Particle settings ----------
