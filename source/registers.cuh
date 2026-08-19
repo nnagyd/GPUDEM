@@ -143,6 +143,13 @@ namespace registerHandling{
             particles.beta.y[tid + NumberOfParticles] = rmem.beta[1].y;
             particles.beta.z[tid + NumberOfParticles] = rmem.beta[1].z;
         }
+
+        /*if(SaveForce)
+        {
+            particles.F.x[tid] += rmem.F.x;
+            particles.F.y[tid] += rmem.F.y;
+            particles.F.z[tid] += rmem.F.z;
+        }*/
         
     }
 
@@ -157,12 +164,6 @@ namespace registerHandling{
      */
     __device__ inline void endOfKernelSync(int tid, struct registerMemory &rmem, struct particle particles)
     {
-        if(SaveForce)
-        {
-            particles.F.x[tid] = rmem.F.x;
-            particles.F.y[tid] = rmem.F.y;
-            particles.F.z[tid] = rmem.F.z;
-        }
 
         if(SaveTorque)
         {

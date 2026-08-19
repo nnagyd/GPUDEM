@@ -29,6 +29,31 @@
 #include "io.cuh"
 #include "registers.cuh"
 
+__device__ __constant__ RuntimeMeshParameters dRuntimeMesh;
+
+inline void setRuntimeMeshParameters(const RuntimeMeshParameters &runtimeMesh)
+{
+    CHECK(cudaMemcpyToSymbol(dRuntimeMesh, &runtimeMesh, sizeof(RuntimeMeshParameters)));
+}
+
+inline boundaryCondition *allocateBoundaryDescriptor()
+{
+    boundaryCondition *descriptor = nullptr;
+    CHECK(cudaMalloc((void **)&descriptor, sizeof(boundaryCondition)));
+    return descriptor;
+}
+
+inline void synchronizeBoundaryDescriptor(boundaryCondition *descriptor, const boundaryCondition &boundary)
+{
+    CHECK(cudaMemcpy(descriptor, &boundary, sizeof(boundaryCondition), cudaMemcpyHostToDevice));
+}
+
+inline void freeBoundaryDescriptor(boundaryCondition *descriptor)
+{
+    CHECK(cudaFree(descriptor));
+}
+
+
 /**
     * @brief Kernel using the perThread approach
     * 
@@ -41,7 +66,7 @@
     * @param launch Number of the kernel launch
     * 
 */
-__global__ void solver(struct particle particles, int numberOfActiveParticles, struct materialParameters pars, struct timestepping timestep, struct bodyForce bodyForces, struct boundaryCondition boundaryConditions, int launch)
+__global__ void solver(struct particle particles, int numberOfActiveParticles, struct materialParameters pars, struct timestepping timestep, struct bodyForce bodyForces, const struct boundaryCondition *boundaryConditions, int launch, int * syncCounter, int GridSize)
 {
     cooperative_groups::grid_group allThreads = cooperative_groups::this_grid();
     int tid = threadIdx.x + blockIdx.x * blockDim.x;
@@ -74,9 +99,9 @@ __global__ void solver(struct particle particles, int numberOfActiveParticles, s
         if(contactSearch == ContactSearch::LinkedCellList)
         {
             int idx = tid;
-            while(idx < DecomposedDomainsConstants::Ncell * DecomposedDomainsConstants::NpCellMax)
+            while(idx < dRuntimeMesh.ncell * DecomposedDomainsConstants::NpCellMax)
             {
-                if(idx < DecomposedDomainsConstants::Ncell)
+                if(idx < dRuntimeMesh.ncell)
                 {
                     particles.NinCell[idx] = 0;
                 }
@@ -88,7 +113,7 @@ __global__ void solver(struct particle particles, int numberOfActiveParticles, s
         //1. boundary conditions 
         if(NumberOfBoundaries > 0)
         {
-            domainHandling::applyBoundaryConditions(tid,rmem,particles,boundaryConditions,contacts,pars,timestep);
+            domainHandling::applyBoundaryConditions(tid,rmem,particles,*boundaryConditions,contacts,pars,timestep);
         }
 
         //2. contact search
@@ -98,14 +123,27 @@ __global__ void solver(struct particle particles, int numberOfActiveParticles, s
         }
         if(contactSearch == ContactSearch::DecomposedDomains || contactSearch == ContactSearch::DecomposedDomainsFast)
         {
-            contactHandling::CalculateCellId(tid,rmem,numberOfActiveParticles,particles,allThreads);
-            contactHandling::DecomposedDomainsContactSearch(tid,rmem,numberOfActiveParticles,particles,contacts);
+            contactHandling::CalculateCellId(tid,rmem,numberOfActiveParticles,particles,dRuntimeMesh);
+            contactHandling::DecomposedDomainsContactSearch(tid,rmem,numberOfActiveParticles,particles,contacts,dRuntimeMesh);
         }
         if(contactSearch == ContactSearch::LinkedCellList)
         {
-            contactHandling::CalculateCellIdLinkedCells(tid,rmem,numberOfActiveParticles,particles,allThreads);
-            contactHandling::LinkedCellListContactSearch(tid,rmem,numberOfActiveParticles,particles,contacts);
+            contactHandling::CalculateCellIdLinkedCells(tid,rmem,numberOfActiveParticles,particles,dRuntimeMesh);
+            if(UseGPUWideThreadSync == 2)
+            {
+                global_sync(syncCounter,GridSize, i - launch*timestep.saveSteps,0);
+            }
+            if(UseGPUWideThreadSync == 1)
+            {
+                allThreads.sync();
+            }
+            if(UseGPUWideThreadSync == 0)
+            {
+                __syncthreads();
+            }
+            contactHandling::LinkedCellListContactSearch(tid,rmem,numberOfActiveParticles,particles,contacts,dRuntimeMesh);
         }
+
 
         //3. calculate forces
         if(contactModel == ContactModel::Mindlin)
@@ -119,11 +157,15 @@ __global__ void solver(struct particle particles, int numberOfActiveParticles, s
         {
             accelerationHandling::addBodyForces(tid, rmem, particles, bodyForces);
         }
-        if(UseGPUWideThreadSync)
+        if(UseGPUWideThreadSync == 2)
+        {
+            global_sync(syncCounter,GridSize, i - launch*timestep.saveSteps,1);
+        }
+        if(UseGPUWideThreadSync == 1)
         {
             allThreads.sync();
         }
-        else
+        if(UseGPUWideThreadSync == 0)
         {
             __syncthreads();
         }
@@ -145,11 +187,15 @@ __global__ void solver(struct particle particles, int numberOfActiveParticles, s
 
         //6. Synchronize registers and global memory
         registerHandling::endOfStepSync(tid,rmem,particles);
-        if(UseGPUWideThreadSync)
+        if(UseGPUWideThreadSync == 2)
+        {
+            global_sync(syncCounter,GridSize, i - launch*timestep.saveSteps,2);
+        }
+        if(UseGPUWideThreadSync == 1)
         {
             allThreads.sync();
         }
-        else
+        if(UseGPUWideThreadSync == 0)
         {
             __syncthreads();
         }

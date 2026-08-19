@@ -18,6 +18,8 @@
 #include <string>
 #include <vector>
 #include "settings.cuh"
+#include "config_runtime.cuh"
+#include "config_parser.cuh"
 #include "material.cuh"
 #include "math.cuh"
 
@@ -26,6 +28,154 @@
  */
 namespace ioHandling
 {
+    /**
+    * \brief Loads runtime simulation configuration from key=value file.
+    *
+    * @param location File location
+    * @param config Target config struct
+    * @param error Error message in case of parse/validation failure
+    *
+    * @return True when loading succeeded
+    */
+    bool loadSimulationConfig(std::string location, runtimeConfig::SimulationConfig &config, std::string &error)
+    {
+        return runtimeConfig::loadFromFile(location, config, error);
+    }
+
+    /**
+    * \brief Writes the effective runtime configuration used for a run.
+    *
+    * @param location Output file location
+    * @param config Runtime configuration
+    */
+    void saveEffectiveConfig(std::string location, const runtimeConfig::SimulationConfig &config)
+    {
+        const auto boundaryModeToString = [](runtimeConfig::RuntimeBoundaryMode mode) -> const char *
+        {
+            switch (mode)
+            {
+            case runtimeConfig::RuntimeBoundaryMode::Fixed:
+                return "fixed";
+            case runtimeConfig::RuntimeBoundaryMode::ForcedVelocity:
+                return "forced";
+            case runtimeConfig::RuntimeBoundaryMode::FreeBodyZ:
+                return "free_body_z";
+            }
+            return "fixed";
+        };
+
+        const auto layoutModeToString = [](runtimeConfig::RuntimeParticleLayoutMode mode) -> const char *
+        {
+            switch (mode)
+            {
+            case runtimeConfig::RuntimeParticleLayoutMode::Auto:
+                return "auto";
+            case runtimeConfig::RuntimeParticleLayoutMode::File:
+                return "file";
+            case runtimeConfig::RuntimeParticleLayoutMode::Generated:
+                return "generated";
+            }
+            return "auto";
+        };
+
+        std::ofstream out(location);
+        if (!out.is_open())
+        {
+            return;
+        }
+
+        out << "source_file=" << config.sourceFile << "\n";
+        out << "is_loaded_from_file=" << (config.isLoadedFromFile ? 1 : 0) << "\n";
+        out << "seed=" << config.seed << "\n";
+
+        out << std::setprecision(9);
+        out << "time.start=" << config.time.start << "\n";
+        out << "time.end=" << config.time.end << "\n";
+        out << "time.dt=" << config.time.dt << "\n";
+        out << "time.save_steps=" << config.time.saveSteps << "\n";
+
+        out << "gravity.x=" << config.gravity.x << "\n";
+        out << "gravity.y=" << config.gravity.y << "\n";
+        out << "gravity.z=" << config.gravity.z << "\n";
+
+        out << "mesh.nx=" << config.mesh.nx << "\n";
+        out << "mesh.ny=" << config.mesh.ny << "\n";
+        out << "mesh.nz=" << config.mesh.nz << "\n";
+        out << "mesh.minx=" << config.mesh.minx << "\n";
+        out << "mesh.miny=" << config.mesh.miny << "\n";
+        out << "mesh.minz=" << config.mesh.minz << "\n";
+        out << "mesh.maxx=" << config.mesh.maxx << "\n";
+        out << "mesh.maxy=" << config.mesh.maxy << "\n";
+        out << "mesh.maxz=" << config.mesh.maxz << "\n";
+        out << "mesh_bounds_runtime_applied=" << (config.mesh.meshBoundsRuntimeApplied ? 1 : 0) << "\n";
+        out << "mesh_counts_runtime_applied=" << (config.mesh.meshCountsRuntimeApplied ? 1 : 0) << "\n";
+
+        out << "output.save_velocity=" << (config.output.saveVelocity ? 1 : 0) << "\n";
+        out << "output.save_angular_velocity=" << (config.output.saveAngularVelocity ? 1 : 0) << "\n";
+        out << "output.save_force=" << (config.output.saveForce ? 1 : 0) << "\n";
+        out << "output.save_torque=" << (config.output.saveTorque ? 1 : 0) << "\n";
+        out << "output.save_id=" << (config.output.saveId ? 1 : 0) << "\n";
+        out << "output.save_material=" << (config.output.saveMaterial ? 1 : 0) << "\n";
+        out << "output.save_tracks_first100=" << (config.output.saveTracksFirst100 ? 1 : 0) << "\n";
+
+        out << "materials.sigma=" << config.materials.sigma << "\n";
+        out << "materials.psi=" << config.materials.psi << "\n";
+        for (size_t i = 0; i < config.materials.entries.size(); ++i)
+        {
+            const runtimeConfig::RuntimeMaterialEntry &entry = config.materials.entries[i];
+            if (!entry.isDefined)
+            {
+                continue;
+            }
+            out << "materials." << i << ".id=" << entry.id << "\n";
+            out << "materials." << i << ".rho=" << entry.rho << "\n";
+            out << "materials." << i << ".E=" << entry.E << "\n";
+            out << "materials." << i << ".nu=" << entry.nu << "\n";
+            out << "materials." << i << ".e=" << entry.e << "\n";
+            out << "materials." << i << ".mu=" << entry.mu << "\n";
+            out << "materials." << i << ".mu0=" << entry.mu0 << "\n";
+            out << "materials." << i << ".mur=" << entry.mur << "\n";
+            out << "materials." << i << ".theta=" << entry.theta << "\n";
+        }
+
+        out << "particles.layout.mode=" << layoutModeToString(config.particleLayout.mode) << "\n";
+        out << "particles.layout.file=" << config.particleLayout.filePath << "\n";
+        out << "particles.layout.generated.radius=" << config.particleLayout.generated.radius << "\n";
+        out << "particles.layout.generated.minx=" << config.particleLayout.generated.minx << "\n";
+        out << "particles.layout.generated.maxx=" << config.particleLayout.generated.maxx << "\n";
+        out << "particles.layout.generated.miny=" << config.particleLayout.generated.miny << "\n";
+        out << "particles.layout.generated.maxy=" << config.particleLayout.generated.maxy << "\n";
+        out << "particles.layout.generated.minz=" << config.particleLayout.generated.minz << "\n";
+        out << "particles.layout.generated.maxz=" << config.particleLayout.generated.maxz << "\n";
+
+        for (size_t i = 0; i < config.boundaries.size(); ++i)
+        {
+            const runtimeConfig::RuntimeBoundaryConfig &boundary = config.boundaries[i];
+            out << "boundaries." << i << ".enabled=" << (boundary.enabled ? 1 : 0) << "\n";
+            out << "boundaries." << i << ".name=" << boundary.name << "\n";
+            out << "boundaries." << i << ".stl_path=" << boundary.stlPath << "\n";
+            out << "boundaries." << i << ".material=" << boundary.materialId << "\n";
+            out << "boundaries." << i << ".mode=" << boundaryModeToString(boundary.mode) << "\n";
+            out << "boundaries." << i << ".velocity.x=" << boundary.velocityX << "\n";
+            out << "boundaries." << i << ".velocity.y=" << boundary.velocityY << "\n";
+            out << "boundaries." << i << ".velocity.z=" << boundary.velocityZ << "\n";
+            out << "boundaries." << i << ".mass=" << boundary.mass << "\n";
+            out << "boundaries." << i << ".initial.x=" << boundary.initialX << "\n";
+            out << "boundaries." << i << ".initial.y=" << boundary.initialY << "\n";
+            out << "boundaries." << i << ".initial.z=" << boundary.initialZ << "\n";
+            out << "boundaries." << i << ".initial_velocity_z=" << boundary.initialVelocityZ << "\n";
+            out << "boundaries." << i << ".start_time=" << boundary.startTime << "\n";
+            out << "boundaries." << i << ".end_time=" << boundary.endTime << "\n";
+            out << "boundaries." << i << ".motion_update_interval=" << boundary.motion.updateIntervalLaunches << "\n";
+            out << "boundaries." << i << ".tracking.enabled=" << (boundary.tracking.enabled ? 1 : 0) << "\n";
+            out << "boundaries." << i << ".tracking.csv_path=" << boundary.tracking.csvPath << "\n";
+            out << "boundaries." << i << ".tracking.write_interval=" << boundary.tracking.writeIntervalLaunches << "\n";
+        }
+
+        out.flush();
+        out.close();
+    }
+
     /**
     * \brief Save the data of a list of particles in a .particle textfile
     *

@@ -75,24 +75,59 @@ namespace forceHandling
                 contacts.deltat[i] = contacts.deltat[i] + (vt_rel * timestep.dt);
 
                 //equivalent stiffness, normal and tangential
-                var_type Rdelta = sqrt(contacts.Rstar[i]*contacts.deltan[i]);
+                var_type Rdelta = sqrt(contacts.Rstar[i]*abs(contacts.deltan[i]));
                 var_type Sn = constant::NUMBER_2 * pars.pairing[rmem.material].E_star[contacts.material[i]] * Rdelta;
                 var_type St = constant::NUMBER_8 * pars.pairing[rmem.material].G_star[contacts.material[i]] * Rdelta;
 
                 /// FORCES
                 //normal elastic force
                 var_type Fne_norm = constant::NUMBER_4o3 * pars.pairing[rmem.material].E_star[contacts.material[i]] * Rdelta * contacts.deltan[i];
-                vec3D Fne = contacts.r[i]* (-Fne_norm);
+                if(AdhesionForce)
+                {
+                    //modify the normal force with the adhesion (JKR theory)
+                    var_type mod = sqrt(constant::NUMBER_16*constant::PI*pars.sigma*pars.pairing[rmem.material].E_star[contacts.material[i]]*Rdelta) * Rdelta;
+                    Fne_norm -= mod;
+                }
 
                 //normal damping force
                 var_type Fnd_norm = constant::DAMPING * pars.pairing[rmem.material].beta_star[contacts.material[i]] * sqrt(Sn * contacts.mstar[i]);
-                vec3D Fnd = vn_rel * Fnd_norm;
-
-                //tangential elastic force
-                vec3D Fte = contacts.deltat[i] * (-St);
 
                 //tangential damping force
                 var_type Ftd_norm = constant::DAMPING * pars.pairing[rmem.material].beta_star[contacts.material[i]] * sqrt(St * contacts.mstar[i]);
+
+                if(WaterBridges && contacts.deltan[i] < constant::ZERO) //if the particles are not in contact, but might have a water bridge
+                {
+                    //modify the normal force with the effect of water bridges
+                    var_type Vls = constant::NUMBER_4 * constant::PI * pars.psi * rmem.R * rmem.R;
+                    var_type Vli = constant::NUMBER_4 * constant::PI * pars.psi * Ri * Ri;
+                    var_type Ns = 8.0f;
+
+                    var_type Vl = (Vli + Vls) / Ns;
+                    var_type zeta = (constant::NUMBER_1 + constant::NUMBER_2 * Vl / (constant::PI * contacts.Rstar[i] * contacts.deltan[i] * contacts.deltan[i])) - constant::NUMBER_1;
+                    var_type mod = constant::NUMBER_4 * constant::PI * contacts.Rstar[i] * pars.sigma * cos(pars.pairing[rmem.material].theta_star[contacts.material[i]]) / (constant::NUMBER_1 + constant::NUMBER_1 / zeta);
+
+                    if(-contacts.deltan[i] < pars.psi) //valid water bridge
+                    {
+                        Fne_norm = -mod;
+                    }
+                    else
+                    {
+                        Fne_norm = constant::ZERO;
+                    }
+
+                    //printf("Water bridge particle %d, Fne = %lf\n",tid,Fne_norm);
+
+                    Fnd_norm = constant::ZERO;
+                    contacts.deltat[i].x = constant::ZERO;
+                    contacts.deltat[i].y = constant::ZERO;
+                    contacts.deltat[i].z = constant::ZERO;
+                    Ftd_norm = constant::ZERO;
+                }
+
+                //force vectors
+                vec3D Fne = contacts.r[i]* (-Fne_norm);
+                vec3D Fnd = vn_rel * Fnd_norm;
+                vec3D Fte = contacts.deltat[i] * (-St); //tangential elastic force
                 vec3D Ftd = vt_rel * Ftd_norm;
 
                 //total normal and tangentional force
@@ -126,6 +161,17 @@ namespace forceHandling
                 //force
                 vec3D F = Fn + Ft;
 
+                /*printf("Fne=(%lf,%lf,%lf)\n",Fne.x,Fne.y,Fne.z);
+                printf("Fnd=(%lf,%lf,%lf)\n",Fnd.x,Fnd.y,Fnd.z);
+                printf("Fte=(%lf,%lf,%lf)\n",Fte.x,Fte.y,Fte.z);
+                printf("Ftd=(%lf,%lf,%lf)\n",Ftd.x,Ftd.y,Ftd.z);
+                printf("dt=(%lf,%lf,%lf)\n", contacts.deltat[i].x, contacts.deltat[i].y, contacts.deltat[i].z);
+                printf("F=(%lf,%lf,%lf)\n",F.x,F.y,F.z);
+                while(true)
+                {
+                    1;
+                }*/
+
                 //add the force and torque to the total
                 rmem.F.x += F.x;
                 rmem.F.y += F.y;
@@ -133,6 +179,12 @@ namespace forceHandling
                 rmem.M.x += M.x;
                 rmem.M.y += M.y;
                 rmem.M.z += M.z;
+
+                //calculate the stresses
+                //shear
+                particles.F.z[tid] += F.z * contacts.p[i].z;
+                particles.F.x[tid] += F.x * contacts.p[i].z;
+                particles.F.y[tid] += F.y * contacts.p[i].z;
             }
         }
     }

@@ -18,8 +18,8 @@
 ///Debug: 0-Off, 1-Low level, 2-High level
 constexpr int Debug = 0;
 
-///Use cooperative groups for GPU Wide synchronization (required for energy conservation)
-constexpr bool UseGPUWideThreadSync = true;
+///Use cooperative groups for GPU Wide synchronization (required for energy conservation) 0 - thread, 1 - with cooperative groups, 2 - with atomic counters
+constexpr int UseGPUWideThreadSync = 1;
 
 ///Variable type used in the code (float/double)
 using var_type = float;
@@ -37,26 +37,29 @@ constexpr int BlockSize = 128;
 
 ///Domain settings
 enum class DomainType { Rectangular, STL };
-constexpr DomainType domainType = DomainType::Rectangular;
+constexpr DomainType domainType = DomainType::STL;
 
 ///Save the forces acting on the triangles
-constexpr bool SaveForcesTriangles = false;
+constexpr bool SaveForcesTriangles = true;
 
 /*
     -------- Particle settings ----------
 */
 
 ///Maximum number of contacts
-constexpr int MaxContactNumber = 12;
+constexpr int MaxContactNumber = 16;
 
 
 /*
     -------- Solver settings ----------
 */
 
-///Body forces (gravity)
+///Other forces
 constexpr bool BodyForce = true;
 constexpr bool RollingFriction = true;
+constexpr bool AdhesionForce = true; //based on JKR
+constexpr bool WaterBridges = true; //based on Israelachvili
+constexpr var_type WaterBridgeDistanceRange = 0.006e-3f; //this is not H_o nor H_r, but the distance where water bridges are considered.
 
 ///Contact model
 enum class ContactModel {Mindlin};
@@ -64,7 +67,7 @@ constexpr ContactModel contactModel = ContactModel::Mindlin;
 
 ///Contact search algorithm
 enum class ContactSearch {BruteForce, DecomposedDomains, DecomposedDomainsFast, LinkedCellList };
-constexpr ContactSearch contactSearch = ContactSearch::BruteForce;
+constexpr ContactSearch contactSearch = ContactSearch::LinkedCellList;
 
 ///Time integration
 enum class TimeIntegration {Euler, Exact, Adams2};
@@ -84,47 +87,35 @@ constexpr OutputFormat outputFormat = OutputFormat::ASCII;
 
 ///Save settings
 constexpr bool SaveVelocity = true;
-constexpr bool SaveAngularVelocity = true;
-constexpr bool SaveForce = false;
+constexpr bool SaveAngularVelocity = false;
+constexpr bool SaveForce = true;
 constexpr bool SaveTorque = false;
-constexpr bool SaveId = false;
+constexpr bool SaveId = true;
 constexpr bool SaveMaterial = false;
 
 /*
-    -------- Setting specifics ------------
+    -------- Runtime-config defaults --------
 */
 
-/* \brief Settings of the decomposed domains algorithm
- * 
-*/
-namespace DecomposedDomainsConstants
+///Default values used by runtime configuration parser when keys are omitted.
+namespace RuntimeConfigDefaults
 {
-    ///Dimension of mesh (1,2,3)
-    constexpr int Dimension = 3;
+    constexpr int FixedSeed = 42690;
 
-    ///Number of particles in a cell
-    constexpr int NpCellMax = 8;
+    constexpr var_type TimeStart = 0.0;
+    constexpr var_type TimeEnd = 1.0;
+    constexpr var_type Dt = 1.0e-6f;
+    constexpr int SaveSteps = 100;
 
-    ///Number of cell in x,y,z direction
-    constexpr int Nx = 32;
-    constexpr int Ny = 32;
-    constexpr int Nz = 64;
-    constexpr int Ncell = Nx*Ny*Nz;
+    constexpr var_type GravityX = 0.0;
+    constexpr var_type GravityY = 0.0;
+    constexpr var_type GravityZ = -9.81f;
 
-    ///Min of coordinates
-    constexpr var_type minx = -1.12;
-    constexpr var_type miny = -1.12;
-    constexpr var_type minz = -0.01;
-
-    ///Max of coordinates
-    constexpr var_type maxx = 1.12;
-    constexpr var_type maxy = 1.12;
-    constexpr var_type maxz = 4.48;
-
-    ///DO NOT MODIFY - 1/max-min pre-calculated
-    constexpr var_type NoverDx = var_type(Nx)/(maxx-minx);
-    constexpr var_type NoverDy = var_type(Ny)/(maxy-miny);
-    constexpr var_type NoverDz = var_type(Nz)/(maxz-minz);
+    constexpr bool SaveTracksFirst100 = true;
 }
+
+// Domain-decomposition constants (DecomposedDomainsConstants) are defined per
+// case in each example_*.cu, since mesh resolution/extent varies between runs.
+// RuntimeMeshParameters lives in mesh_parameters.cuh.
 
 #endif

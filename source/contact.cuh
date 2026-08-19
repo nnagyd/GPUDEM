@@ -20,6 +20,7 @@
 #include "math.cuh"
 #include "registers.cuh"
 #include "settings.cuh"
+#include "mesh_parameters.cuh"
 
  /**
  * \brief Contact data between particles, stored in the registers (preferably)
@@ -66,21 +67,14 @@ struct contact
  */
 namespace contactHandling
 {
-    ///calculate neighbours on compile time
-    __device__ constexpr int Neighbours[27] = {
-        0, 1, -1, DecomposedDomainsConstants::Nx,    -DecomposedDomainsConstants::Nx, 
-        DecomposedDomainsConstants::Nx*DecomposedDomainsConstants::Ny,          -DecomposedDomainsConstants::Nx*DecomposedDomainsConstants::Ny,
-        DecomposedDomainsConstants::Nx - 1,         -DecomposedDomainsConstants::Nx - 1, 
-        DecomposedDomainsConstants::Nx + 1,         -DecomposedDomainsConstants::Nx + 1, 
-        DecomposedDomainsConstants::Nx*DecomposedDomainsConstants::Ny + 1,      -DecomposedDomainsConstants::Nx*DecomposedDomainsConstants::Ny + 1,
-        DecomposedDomainsConstants::Nx*DecomposedDomainsConstants::Ny - 1,      -DecomposedDomainsConstants::Nx*DecomposedDomainsConstants::Ny - 1,
-        DecomposedDomainsConstants::Nx*(1+DecomposedDomainsConstants::Ny),      -DecomposedDomainsConstants::Nx*(1+DecomposedDomainsConstants::Ny),
-        DecomposedDomainsConstants::Nx*(1+DecomposedDomainsConstants::Ny)+1,    -DecomposedDomainsConstants::Nx*(1+DecomposedDomainsConstants::Ny)+1,
-        DecomposedDomainsConstants::Nx*(1+DecomposedDomainsConstants::Ny)-1,    -DecomposedDomainsConstants::Nx*(1+DecomposedDomainsConstants::Ny)-1,
-        DecomposedDomainsConstants::Nx*(-1+DecomposedDomainsConstants::Ny),     -DecomposedDomainsConstants::Nx*(-1+DecomposedDomainsConstants::Ny),
-        DecomposedDomainsConstants::Nx*(-1+DecomposedDomainsConstants::Ny)+1,   -DecomposedDomainsConstants::Nx*(-1+DecomposedDomainsConstants::Ny)+1,
-        DecomposedDomainsConstants::Nx*(-1+DecomposedDomainsConstants::Ny)-1,   -DecomposedDomainsConstants::Nx*(-1+DecomposedDomainsConstants::Ny)-1
-    };
+    __device__ inline void decodeCellId(int cid, const RuntimeMeshParameters &mesh, int &cx, int &cy, int &cz)
+    {
+        const int cellsPerLayer = mesh.nx * mesh.ny;
+        cz = cid / cellsPerLayer;
+        const int inLayer = cid - cz * cellsPerLayer;
+        cy = inLayer / mesh.nx;
+        cx = inLayer - cy * mesh.nx;
+    }
 
     /**
     * \brief Checks if two cells are neighbours or not
@@ -90,51 +84,33 @@ namespace contactHandling
     *
     * @return Returns if the cells are neighbours or not
     */
-    __device__ inline bool areNeighbours(int cid1, int cid2)
+    __device__ inline bool areNeighbours(int cid1, int cid2, const RuntimeMeshParameters &mesh)
     {
-        if( contactSearch == ContactSearch::DecomposedDomains && DecomposedDomainsConstants::Dimension == 3)
-        {
-            if(cid1 == cid2 || cid1 == cid2 + Neighbours[1] || cid1 == cid2 + Neighbours[2] ||
-                cid1 == cid2 + Neighbours[3] || cid1 == cid2 + Neighbours[4] ||
-                cid1 == cid2 + Neighbours[5] || cid1 == cid2 + Neighbours[6] ||
-                cid1 == cid2 + Neighbours[7] || cid1 == cid2 + Neighbours[8] ||
-                cid1 == cid2 + Neighbours[9] || cid1 == cid2 + Neighbours[10] ||
-                cid1 == cid2 + Neighbours[11] || cid1 == cid2 + Neighbours[12] ||
-                cid1 == cid2 + Neighbours[13] || cid1 == cid2 + Neighbours[14] ||
-                cid1 == cid2 + Neighbours[15] || cid1 == cid2 + Neighbours[16] ||
-                cid1 == cid2 + Neighbours[17] || cid1 == cid2 + Neighbours[18] ||
-                cid1 == cid2 + Neighbours[19] || cid1 == cid2 + Neighbours[20] ||
-                cid1 == cid2 + Neighbours[21] || cid1 == cid2 + Neighbours[22] ||
-                cid1 == cid2 + Neighbours[23] || cid1 == cid2 + Neighbours[24] ||
-                cid1 == cid2 + Neighbours[25] || cid1 == cid2 + Neighbours[26] )
-                return true;
-            else return false;
-        }
+        int cx1, cy1, cz1;
+        int cx2, cy2, cz2;
+        decodeCellId(cid1, mesh, cx1, cy1, cz1);
+        decodeCellId(cid2, mesh, cx2, cy2, cz2);
 
-        if( contactSearch == ContactSearch::DecomposedDomains && DecomposedDomainsConstants::Dimension == 2)
-        {
-            if(cid1 == cid2 || cid1 == cid2 + Neighbours[1] || cid1 == cid2 + Neighbours[2] ||
-                cid1 == cid2 + Neighbours[3] || cid1 == cid2 + Neighbours[4] ||
-                cid1 == cid2 + Neighbours[7] || cid1 == cid2 + Neighbours[8] ||
-                cid1 == cid2 + Neighbours[9] || cid1 == cid2 + Neighbours[10] )
-                return true;
-            else return false;
-        }
+        int dx = cx1 - cx2;
+        int dy = cy1 - cy2;
+        int dz = cz1 - cz2;
+        if(dx < 0) dx = -dx;
+        if(dy < 0) dy = -dy;
+        if(dz < 0) dz = -dz;
 
-        if( contactSearch == ContactSearch::DecomposedDomains && DecomposedDomainsConstants::Dimension == 1)
+        if(contactSearch == ContactSearch::DecomposedDomainsFast)
         {
-            if(cid1 == cid2 || cid1 == cid2 + Neighbours[1] || cid1 == cid2 + Neighbours[2])
-                return true;
-            else return false;
+            return (dx <= 1 && dy <= 1 && dz == 0);
         }
-
-        if( contactSearch == ContactSearch::DecomposedDomainsFast )
+        if(DecomposedDomainsConstants::Dimension == 1)
         {
-            if(cid1 == cid2 || cid1 == cid2 + Neighbours[1] || cid1 == cid2 + Neighbours[2] ||
-                cid1 == cid2 + Neighbours[3] || cid1 == cid2 + Neighbours[4]  )
-                return true;
-            else return false;
-        }    
+            return (dx <= 1 && dy == 0 && dz == 0);
+        }
+        if(DecomposedDomainsConstants::Dimension == 2)
+        {
+            return (dx <= 1 && dy <= 1 && dz == 0);
+        }
+        return (dx <= 1 && dy <= 1 && dz <= 1);
     } 
 
 
@@ -157,6 +133,7 @@ namespace contactHandling
         bool wasInContact = false;
 
         contacts.deltan[contacts.count] = Rs - d;
+        //printf("deltan = %lf\n",contacts.deltan[contacts.count]);
 
         //contact position
         contacts.p[contacts.count].x = constant::NUMBER_05*(particles.u.x[i]-rmem.u.x);
@@ -270,7 +247,7 @@ namespace contactHandling
     * @param particles All the particle data
     * 
     */
-    void __device__ CalculateCellId(int tid, struct registerMemory &rmem, int numberOfActiveParticles, struct particle particles,cooperative_groups::grid_group allThreads)
+    void __device__ CalculateCellId(int tid, struct registerMemory &rmem, int numberOfActiveParticles, struct particle particles, const RuntimeMeshParameters &mesh)
     {
         //if particle is inactive
         if(tid >= numberOfActiveParticles)
@@ -280,40 +257,30 @@ namespace contactHandling
         int Cx,Cy,Cz;
 
         //callculate cell coordinates
-        Cx = int((rmem.u.x - DecomposedDomainsConstants::minx)*DecomposedDomainsConstants::NoverDx);
+        Cx = int((rmem.u.x - mesh.minx)*mesh.NoverDx);
         if(Cx < 0) Cx = 0;
-        if(Cx >= DecomposedDomainsConstants::Nx) Cx = DecomposedDomainsConstants::Nx-1;
+        if(Cx >= mesh.nx) Cx = mesh.nx-1;
         rmem.cid = Cx;
 
         if(DecomposedDomainsConstants::Dimension >= 2)
         {
-            Cy = int((rmem.u.y - DecomposedDomainsConstants::miny)*DecomposedDomainsConstants::NoverDy);
+            Cy = int((rmem.u.y - mesh.miny)*mesh.NoverDy);
             if(Cy < 0) Cy = 0;
-            if(Cy >= DecomposedDomainsConstants::Ny) Cy = DecomposedDomainsConstants::Ny-1;
-            rmem.cid = Cx + DecomposedDomainsConstants::Nx * Cy;
+            if(Cy >= mesh.ny) Cy = mesh.ny-1;
+            rmem.cid = Cx + mesh.nx * Cy;
         }
 
         if(DecomposedDomainsConstants::Dimension >= 3)
         {
-            Cz = int((rmem.u.z - DecomposedDomainsConstants::minz)*DecomposedDomainsConstants::NoverDz);
+            Cz = int((rmem.u.z - mesh.minz)*mesh.NoverDz);
             if(Cz < 0) Cz = 0;
-            if(Cz >= DecomposedDomainsConstants::Nz) Cz = DecomposedDomainsConstants::Nz-1;
-            rmem.cid = Cx + DecomposedDomainsConstants::Nx * Cy +  DecomposedDomainsConstants::Nx * DecomposedDomainsConstants::Ny * Cz;
+            if(Cz >= mesh.nz) Cz = mesh.nz-1;
+            rmem.cid = Cx + mesh.nx * Cy +  mesh.nx * mesh.ny * Cz;
         }
 
 
         //write to global memory
         particles.cid[tid] = rmem.cid;
-
-        if(UseGPUWideThreadSync)
-        {
-            allThreads.sync();
-        }
-        else
-        {
-            __syncthreads();
-        }
-
     }//end of CalculateCellId
 
     /**
@@ -325,7 +292,7 @@ namespace contactHandling
     * @param particles All the particle data
     * 
     */
-    void __device__ CalculateCellIdLinkedCells(int tid, struct registerMemory &rmem, int numberOfActiveParticles, struct particle particles,cooperative_groups::grid_group allThreads)
+    void __device__ CalculateCellIdLinkedCells(int tid, struct registerMemory &rmem, int numberOfActiveParticles, struct particle particles, const RuntimeMeshParameters &mesh)
     {
         //if particle is inactive
         if(tid >= numberOfActiveParticles)
@@ -335,21 +302,21 @@ namespace contactHandling
         int Cx,Cy,Cz;
 
         //callculate cell coordinates
-        Cx = int((rmem.u.x - DecomposedDomainsConstants::minx)*DecomposedDomainsConstants::NoverDx);
-        Cy = int((rmem.u.y - DecomposedDomainsConstants::miny)*DecomposedDomainsConstants::NoverDy);
-        Cz = int((rmem.u.z - DecomposedDomainsConstants::minz)*DecomposedDomainsConstants::NoverDz);
+        Cx = int((rmem.u.x - mesh.minx)*mesh.NoverDx);
+        Cy = int((rmem.u.y - mesh.miny)*mesh.NoverDy);
+        Cz = int((rmem.u.z - mesh.minz)*mesh.NoverDz);
 
         //apply limits
         if(Cx < 0) Cx = 0;
-        if(Cx >= DecomposedDomainsConstants::Nx) Cx = DecomposedDomainsConstants::Nx-1;
+        if(Cx >= mesh.nx) Cx = mesh.nx-1;
         if(Cy < 0) Cy = 0;
-        if(Cy >= DecomposedDomainsConstants::Ny) Cy = DecomposedDomainsConstants::Ny-1;
+        if(Cy >= mesh.ny) Cy = mesh.ny-1;
         rmem.cid = Cx;
         if(Cz < 0) Cz = 0;
-        if(Cz >= DecomposedDomainsConstants::Nz) Cz = DecomposedDomainsConstants::Nz-1;
+        if(Cz >= mesh.nz) Cz = mesh.nz-1;
 
         //calculate cell id
-        rmem.cid = Cx + DecomposedDomainsConstants::Nx * Cy +  DecomposedDomainsConstants::Nx * DecomposedDomainsConstants::Ny * Cz;
+        rmem.cid = Cx + mesh.nx * Cy +  mesh.nx * mesh.ny * Cz;
 
         //write to global memory
         particles.cid[tid] = rmem.cid;
@@ -366,17 +333,6 @@ namespace contactHandling
 
         //save the particle in the linked cell list
         particles.linkedCellList[rmem.cid*DecomposedDomainsConstants::NpCellMax + idInCell] = tid;
-
-
-        if(UseGPUWideThreadSync)
-        {
-            allThreads.sync();
-        }
-        else
-        {
-            __syncthreads();
-        }
-
     }//end of CalculateCellId
 
     /**
@@ -388,13 +344,13 @@ namespace contactHandling
     * @param particles All the particle data
     * @param contacts List of contacts
     */
-    void __device__ DecomposedDomainsContactSearch(int tid, struct registerMemory &rmem, int numberOfActiveParticles, struct particle particles, struct contact &contacts)
+    void __device__ DecomposedDomainsContactSearch(int tid, struct registerMemory &rmem, int numberOfActiveParticles, struct particle particles, struct contact &contacts, const RuntimeMeshParameters &mesh)
     {
         //go through all the particles
         for(int i = 0; i < numberOfActiveParticles; i++)
         { 
             int cid = particles.cid[i];
-            if( areNeighbours(rmem.cid,cid)) //if other particle is in a neighbouring cell
+            if( areNeighbours(rmem.cid,cid,mesh)) //if other particle is in a neighbouring cell
             {
                 var_type d = calculateDistance(rmem.u.x,rmem.u.y,rmem.u.z,particles.u.x[i],particles.u.y[i],particles.u.z[i]);
                 var_type Rs = rmem.R + particles.R[i];
@@ -416,25 +372,68 @@ namespace contactHandling
     * @param particles All the particle data
     * @param contacts List of contacts
     */
-    void __device__ LinkedCellListContactSearch(int tid, struct registerMemory &rmem, int numberOfActiveParticles, struct particle particles, struct contact &contacts)
+    void __device__ LinkedCellListContactSearch(int tid, struct registerMemory &rmem, int numberOfActiveParticles, struct particle particles, struct contact &contacts, const RuntimeMeshParameters &mesh)
     {
-        //go through neighbouring cells
-        for(int i = 0; i < 27; i++)
-        {
-            //cell id of neighbour
-            int cid = rmem.cid + Neighbours[i];
+        int cx, cy, cz;
+        decodeCellId(rmem.cid, mesh, cx, cy, cz);
 
-            if(cid >= 0 && cid < DecomposedDomainsConstants::Ncell)
+        //go through neighbouring cells
+        for(int dz = -1; dz <= 1; dz++)
+        {
+            if(DecomposedDomainsConstants::Dimension < 3 && dz != 0)
             {
-                for(int j = 0; j < particles.NinCell[cid]; j++)
+                continue;
+            }
+            const int ncz = cz + dz;
+            if(ncz < 0 || ncz >= mesh.nz)
+            {
+                continue;
+            }
+
+            for(int dy = -1; dy <= 1; dy++)
+            {
+                if(DecomposedDomainsConstants::Dimension < 2 && dy != 0)
                 {
-                    int idx = particles.linkedCellList[cid*DecomposedDomainsConstants::NpCellMax + j];
+                    continue;
+                }
+                const int ncy = cy + dy;
+                if(ncy < 0 || ncy >= mesh.ny)
+                {
+                    continue;
+                }
+
+                for(int dx = -1; dx <= 1; dx++)
+                {
+                    const int ncx = cx + dx;
+                    if(ncx < 0 || ncx >= mesh.nx)
+                    {
+                        continue;
+                    }
+
+                    const int cid = ncx + mesh.nx * ncy + mesh.nx * mesh.ny * ncz;
+
+                    if(cid >= 0 && cid < mesh.ncell)
+                    {
+                        for(int j = 0; j < particles.NinCell[cid]; j++)
+                        {
+                            int idx = particles.linkedCellList[cid*DecomposedDomainsConstants::NpCellMax + j];
 
                     var_type d_square = calculateDistanceSquare(rmem.u.x,rmem.u.y,rmem.u.z,particles.u.x[idx],particles.u.y[idx],particles.u.z[idx]);
                     var_type Rs = rmem.R + particles.R[idx];
-                    if(d_square < Rs*Rs && tid != idx) //contact found
+                    var_type dist_check = Rs;
+
+                    if(WaterBridges)
                     {
-                        CalculateContact(tid,rmem,idx,sqrt(d_square),Rs,particles,contacts);
+                        dist_check += WaterBridgeDistanceRange;
+                    }
+
+
+                    //printf("cid = %d tid = %d x=(%lf,%lf,%lf) idx = %d d2 = %lf dist = %lf\n",cid,tid,rmem.u.x,rmem.u.y,rmem.u.z,idx,d_square,dist_check);
+                            if(d_square < dist_check*dist_check && tid != idx) //contact found
+                            {
+                                CalculateContact(tid,rmem,idx,sqrt(d_square),Rs,particles,contacts);
+                            }
+                        }
                     }
                 }
             }

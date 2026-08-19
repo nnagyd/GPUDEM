@@ -22,6 +22,7 @@ struct materialContact
     var_type E_star[NumberOfMaterials];
     var_type G_star[NumberOfMaterials];
     var_type beta_star[NumberOfMaterials];
+    var_type theta_star[NumberOfMaterials];
 };
 
 /**
@@ -47,6 +48,12 @@ struct materialParameters
     var_type mur[NumberOfMaterials];
     ///Damping
     var_type beta[NumberOfMaterials];
+    ///Surface tension
+    var_type sigma;
+    ///Contact angle
+    var_type theta[NumberOfMaterials];
+    ///total liquid volume / total surface area
+    var_type psi;
     ///Lookup table for material pairinga
     struct materialContact pairing[NumberOfMaterials];
 };
@@ -78,6 +85,7 @@ namespace materialHandling
             std::cout << "     Friction coeff. [mu]   = " <<  pars.mu[i] <<" \n";
             std::cout << "Stat.friction coeff. [mu]_0 = " <<  pars.mu0[i] <<" \n";
             std::cout << "             Damping [beta] = " <<  pars.beta[i] <<" \n";
+            std::cout << "      Contact angle [theta] = " <<  pars.theta[i] <<" \n";
 
             if(printPairings)
             {
@@ -89,6 +97,7 @@ namespace materialHandling
                     std::cout << "\t Eq. Friction coeff. [mu]   = " <<  pars.pairing[i].mu_star[j] <<" \n";
                     std::cout << "\tEq.stat.fric. coeff. [mu]_0 = " <<  pars.pairing[i].mu0_star[j] <<" \n";
                     std::cout << "\t         Eq. Damping [beta] = " <<  pars.pairing[i].beta_star[j] <<" \n";
+                    std::cout << "\t      Contact angle [theta] = " <<  pars.pairing[i].theta_star[j] <<" \n";
                 }
             }
         }
@@ -115,6 +124,9 @@ namespace materialHandling
         {
             for(int j = 0; j < NumberOfMaterials; j++)
             {
+                //------ calculate contact angle ------
+                pars.pairing[i].theta_star[j] = acos( constant::NUMBER_05*(cos(pars.theta[i])+cos(pars.theta[j])) );
+
                 //------ calculate friction ------
                 if(friction == methods::Min)
                 {

@@ -44,7 +44,9 @@ namespace constant
     constexpr var_type NUMBER_4o3 = 4.0/3.0;
     constexpr var_type NUMBER_1 = 1.0;
     constexpr var_type NUMBER_2 = 2.0;
+    constexpr var_type NUMBER_4 = 4.0;
     constexpr var_type NUMBER_8 = 8.0;
+    constexpr var_type NUMBER_16 = 16.0;
 
     //constants in numerical methods
     constexpr var_type AB2C1 = 1.5;
@@ -162,6 +164,27 @@ __device__ inline var_type calculateNormal(var_type v1, var_type v2, var_type v3
 inline var_type calculateDetBeta(vec3D s, vec3D t, vec3D n)
 {
     return -n.z*s.y*t.x + n.y*s.z*t.x + n.z*s.x*t.y - n.x*s.z*t.y - n.y*s.x*t.z + n.x*s.y*t.z;
+}
+
+__device__ void global_sync(int * syncCounter, int totalBlocks, int iter, int cas) 
+{
+    int * idx_sync = syncCounter + 3*iter + cas;
+    __syncthreads();  
+
+    // First thread in the block increments the counter
+    if (threadIdx.x == 0) {
+        atomicAdd(idx_sync, 1);
+    }
+    __syncthreads();  
+
+    // Last arriving block signals all threads
+    if (threadIdx.x == 0) {
+        while (*idx_sync < totalBlocks) {
+            //printf("block=%d\tid=%d\tcounter=%d < %d\n",blockIdx.x,3*iter + cas,*idx_sync,totalBlocks);
+            // Busy-wait until all blocks reach this point
+        }
+    }
+    __syncthreads();
 }
 
 

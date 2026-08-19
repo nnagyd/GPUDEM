@@ -1,16 +1,28 @@
-# GPUDEM BETA
-GPUDEM is a an open source GPU based discrete element solver using CUDA, currently in beta version.
-The code is provided under the GNU GENERAL PUBLIC LICENSE.
+# GPUDEM New
 
-# Installation
-Download the repository, install CUDA (compute capability 8.0 or above required for full functionality) and a C++17 compiler. The code then can be compiled using the given makefile in the examples or the following command
+GPUDEM New is a CUDA-based Discrete Element Method solver package prepared for reproducible research workflows.
+
+This project includes:
+- Runtime-configurable simulation controls (time, gravity, mesh)
+- Runtime-configurable moving STL boundary motion controls
+- Example configurations for deposition, shear box testing, and cone penetration
+
+The code is provided under the GNU General Public License (see LICENSE).
+
+## Installation
+
+Prerequisites:
+- CUDA toolkit compatible with your GPU architecture
+- A compatible host compiler
+
+Build from the files directory:
+
+```bash
+cd files
+make e1
 ```
-nvcc -o GPUDEM -std=c++17 --gpu-architecture=sm_XX -maxrregcount=128 -I/path/to/GPUDEM
-```
-where XX is your CUDA compute capability.
 
+## Documentation
 
-# Usage
-The code is documented using doxygen.
-For usage refer to the provided examples. 
-
+See docs for publication-oriented material:
+- HOWTO.md — build/run guide, config format, and the physics solved

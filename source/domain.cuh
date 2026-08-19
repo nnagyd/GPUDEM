@@ -113,7 +113,7 @@ namespace domainHandling
     *
     * 
     */
-    __device__ inline void applyBoundaryConditions(int tid, struct registerMemory &rmem, struct particle particles, struct boundaryCondition &boundaryConditions, struct contact &contacts, struct materialParameters pars, struct timestepping timestep)
+    __device__ inline void applyBoundaryConditions(int tid, struct registerMemory &rmem, struct particle particles, const struct boundaryCondition &boundaryConditions, struct contact &contacts, struct materialParameters pars, struct timestepping timestep)
     {
         for(int i = 0; i < NumberOfBoundaries; i++)
         {
@@ -121,8 +121,14 @@ namespace domainHandling
             vec3D r(rmem.u.x,rmem.u.y,rmem.u.z);
             vec3D rmp = r - boundaryConditions.p[i];
             var_type d = -1.0f * (boundaryConditions.n[i] * rmp);
+            var_type modifier = constant::ZERO;
 
-            if(d < rmem.R && d > -rmem.R) //particle and wall contact
+            if(WaterBridges)
+            {
+                modifier = WaterBridgeDistanceRange;
+            }
+
+            if(d+modifier < rmem.R && d-modifier > -rmem.R) //particle and wall contact
             {
                 //chech validity of contact if STLs are used
                 bool contactValid = true;
@@ -189,19 +195,53 @@ namespace domainHandling
 
                         //normal elastic force
                         var_type Fne_norm = constant::NUMBER_4o3 * pars.pairing[rmem.material].E_star[boundaryConditions.material[i]] * Rdelta * contacts.deltan[contacts.count];
-                        vec3D Fne = boundaryConditions.n[i]* (-Fne_norm);
+                        if(AdhesionForce)
+                        {
+                            //modify the normal force with the adhesion (JKR theory)
+                            var_type mod = sqrt(constant::NUMBER_16*constant::PI*pars.sigma*pars.pairing[rmem.material].E_star[boundaryConditions.material[i]]*Rdelta) * Rdelta;
+                            Fne_norm -= mod;
+                        }
 
                         //normal damping force
                         var_type Fnd_norm = constant::DAMPING * pars.pairing[rmem.material].beta_star[boundaryConditions.material[i]] * sqrt(Sn * rmem.m);
-                        vec3D Fnd = vn_rel * Fnd_norm;
-
-                        //tangential elastic force
-                        vec3D Fte;
-                        Fte = contacts.deltat[contacts.count] * (-St);
 
                         //tangential damping force
                         var_type Ftd_norm = constant::DAMPING * pars.pairing[rmem.material].beta_star[boundaryConditions.material[i]] * sqrt(St * rmem.m);
+
+                        if(WaterBridges && contacts.deltan[contacts.count] < constant::ZERO) //if the particles are not in contact, but might have a water bridge
+                        {
+                            //modify the normal force with the effect of water bridges
+                            var_type Vls = constant::NUMBER_4 * constant::PI * pars.psi * rmem.R * rmem.R;
+                            var_type Ns = constant::NUMBER_4;
+
+                            var_type Vl = Vls / Ns;
+                            var_type zeta = (constant::NUMBER_1 + Vl / (constant::PI * rmem.R * contacts.deltan[contacts.count] * contacts.deltan[contacts.count])) - constant::NUMBER_1;
+                            var_type mod = constant::NUMBER_4 * constant::PI * rmem.R * pars.sigma * cos(pars.pairing[rmem.material].theta_star[boundaryConditions.material[i]]) / (constant::NUMBER_1 + constant::NUMBER_1 / zeta);
+
+                            if(-contacts.deltan[contacts.count] < pars.psi) //valid water bridge
+                            {
+                                Fne_norm = -mod;
+                            }
+                            else
+                            {
+                                Fne_norm = constant::ZERO;
+                            }
+
+                            //printf("Water bridge particle %d, Fne = %lf\n",tid,Fne_norm);
+
+                            Fnd_norm = constant::ZERO;
+                            contacts.deltat[contacts.count].x = constant::ZERO;
+                            contacts.deltat[contacts.count].y = constant::ZERO;
+                            contacts.deltat[contacts.count].z = constant::ZERO;
+                            Ftd_norm = constant::ZERO;
+                        }
+
+
+                        vec3D Fne = boundaryConditions.n[i]* (-Fne_norm);
+                        vec3D Fnd = vn_rel * Fnd_norm;
+                        vec3D Fte = contacts.deltat[contacts.count] * (-St);
                         vec3D Ftd = vt_rel * Ftd_norm;
+
 
                         //total normal and tangentional force
                         vec3D Fn = Fne + Fnd;
@@ -245,9 +285,9 @@ namespace domainHandling
                         if(SaveForcesTriangles)
                         {
                             //save the force acting on the boundary
-                            boundaryConditions.F[i].x += F.x;
-                            boundaryConditions.F[i].y += F.y;
-                            boundaryConditions.F[i].z += F.z;
+                            atomicAdd(&boundaryConditions.F[i].x,F.x);
+                            atomicAdd(&boundaryConditions.F[i].y,F.y);
+                            atomicAdd(&boundaryConditions.F[i].z,F.z);
                             boundaryConditions.M[i].x += M.x;
                             boundaryConditions.M[i].y += M.y;
                             boundaryConditions.M[i].z += M.z;
